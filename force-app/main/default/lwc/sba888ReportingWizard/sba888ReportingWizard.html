@@ -1,0 +1,79 @@
+<template>
+    <lightning-card title="SBA 888 Training Report" icon-name="standard:report">
+        <div class="slds-p-around_medium">
+
+            <c-nexus-report-validation-panel
+                if:true={showValidationPanel}
+                validation-results={validationResults}
+                error-count={errorCount}
+                warning-count={warningCount}>
+            </c-nexus-report-validation-panel>
+
+            <lightning-progress-indicator current-step={currentStepStr} type="path">
+                <lightning-progress-step label="Select Period" value="1"></lightning-progress-step>
+                <lightning-progress-step label="Validate"      value="2"></lightning-progress-step>
+                <lightning-progress-step label="Review"        value="3"></lightning-progress-step>
+                <lightning-progress-step label="Generating"    value="4"></lightning-progress-step>
+            </lightning-progress-indicator>
+
+            <div class="slds-m-top_medium">
+
+                <template if:true={isStep1}>
+                    <div class="slds-grid slds-gutters slds-wrap">
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-combobox label="Quarter" value={selectedQuarter}
+                                options={quarterOptions} onchange={handleQuarterChange} required>
+                            </lightning-combobox>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-combobox label="Year" value={selectedYear}
+                                options={yearOptions} onchange={handleYearChange} required>
+                            </lightning-combobox>
+                        </div>
+                    </div>
+                    <div class="slds-m-top_medium">
+                        <lightning-button label="Validate Data →" variant="brand"
+                            onclick={handleValidate} disabled={isValidateDisabled}>
+                        </lightning-button>
+                    </div>
+                </template>
+
+                <template if:true={isStep2}>
+                    <template if:true={isValidating}>
+                        <lightning-spinner alternative-text="Validating..." size="medium"></lightning-spinner>
+                    </template>
+                    <template if:false={isValidating}>
+                        <p><strong>{totalRecords}</strong> records for <strong>{quarterYear}</strong></p>
+                        <div class="slds-grid slds-gutters slds-m-top_small">
+                            <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+                            <div class="slds-col slds-text-align_right">
+                                <lightning-button label="Review →" variant="brand"
+                                    onclick={handleProceedToReview} disabled={hasErrors}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+
+                <template if:true={isStep3}>
+                    <div class="slds-box slds-m-bottom_medium">
+                        <p><strong>Quarter:</strong> {quarterYear}</p>
+                        <p><strong>Records:</strong> {totalRecords}</p>
+                    </div>
+                    <div class="slds-grid slds-gutters">
+                        <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+                        <div class="slds-col slds-text-align_right">
+                            <lightning-button label="Generate XML" variant="brand" onclick={handleGenerate}></lightning-button>
+                        </div>
+                    </div>
+                </template>
+
+                <template if:true={isStep4}>
+                    <c-nexus-report-progress-tracker job-id={jobId} onjobcomplete={handleJobComplete}>
+                    </c-nexus-report-progress-tracker>
+                </template>
+
+            </div>
+        </div>
+    </lightning-card>
+</template>

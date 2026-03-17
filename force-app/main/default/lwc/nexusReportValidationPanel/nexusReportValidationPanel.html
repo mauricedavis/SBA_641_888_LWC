@@ -1,0 +1,30 @@
+<template>
+    <template if:true={hasResults}>
+        <div class="slds-m-bottom_medium">
+            <div class="slds-grid slds-wrap slds-gutters slds-m-bottom_x-small">
+                <template if:true={errorCount}>
+                    <div class="slds-col">
+                        <span class="slds-badge slds-badge_error">{errorCount} Error(s) — fix before generating</span>
+                    </div>
+                </template>
+                <template if:true={warningCount}>
+                    <div class="slds-col">
+                        <span class="slds-badge slds-theme_warning slds-m-left_x-small">{warningCount} Warning(s)</span>
+                    </div>
+                </template>
+            </div>
+            <lightning-accordion allow-multiple-sections-open>
+                <lightning-accordion-section name="errors" label="Errors" if:true={errorCount}>
+                    <template for:each={errors} for:item="r">
+                        <p key={r.recordId} class="slds-text-color_error slds-m-bottom_xx-small">⛔ {r.displayLabel}</p>
+                    </template>
+                </lightning-accordion-section>
+                <lightning-accordion-section name="warnings" label="Warnings" if:true={warningCount}>
+                    <template for:each={warnings} for:item="r">
+                        <p key={r.recordId} class="slds-m-bottom_xx-small">⚠️ {r.displayLabel}</p>
+                    </template>
+                </lightning-accordion-section>
+            </lightning-accordion>
+        </div>
+    </template>
+</template>
