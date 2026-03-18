@@ -51,7 +51,8 @@ public with sharing class SBA641_XMLBatch_REFACTORED
             ' CurrentlyInBusiness_ClientIntake__c, CurrentlyExporting_ClientIntake__c,' +
             ' CompanyName_ClientIntake__c, BusinessType_ClientIntake__c,' +
             ' BusinessOwnership_Female__c, ConductingBusinessOnline_ClientIntake__c,' +
-            ' Certified8a_ClientIntake__c, Employee_Owned__c,' +
+            ' Certified8a_ClientIntake__c, EmployeeOwned_ClientIntake__c,' +
+            ' Rural_vs_Urban_ClientIntake__c, FIPS_Code_ClientIntake__c,' +
             ' TotalNumberofEmployees_ClientIntake__c, NumberOfEmployeesInExportingBusiness__c,' +
             ' GrossRevenues_ClientAnnualIncomePart2__c, ProfitLoss_ClientAnnualIncomePart2__c,' +
             ' ExportGrossRevenuesOrSales__c, LegalEntity_ClientIntake__c, LegalEntity_Other_ClientIntake__c,' +
@@ -82,8 +83,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
             ' Street1_AddressPart3__c, City_AddressPart3__c, State_AddressPart3__c,' +
             ' ZipCode_AddressPart3__c, Country_AddressPart3__c,' +
             ' VerifiedToBeInBusiness_CounselorRecord__c, CounselorNotes_CounselorRecord__c,' +
-            ' CurrentlyExporting_CounselorRecord_Part3__c,' +
-            ' Rural_vs_Urban__c, FIPS_Code__c' +
+            ' CurrentlyExporting_CounselorRecord_Part3__c' +
             ' FROM SBA_641_Output__c' +
             ' WHERE Quarter_Year__c = :varQuarterYear'
         );
@@ -161,7 +161,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
             xmlOutput += '<BusinessOwnership>' + xt('Female', String.valueOf(r.BusinessOwnership_Female__c != null ? r.BusinessOwnership_Female__c : 0)) + '</BusinessOwnership>\n';
             xmlOutput += xt('ConductingBusinessOnline', r.ConductingBusinessOnline_ClientIntake__c);
             xmlOutput += xt('ClientIntake_Certified8a', r.Certified8a_ClientIntake__c != null ? r.Certified8a_ClientIntake__c : 'No');
-            if (String.isNotBlank(r.Employee_Owned__c)) xmlOutput += xt('Employee_Owned', r.Employee_Owned__c); // XSD change #139
+            if (String.isNotBlank(r.EmployeeOwned_ClientIntake__c)) xmlOutput += xt('Employee_Owned', r.EmployeeOwned_ClientIntake__c); // XSD change #139
             xmlOutput += xt('TotalNumberOfEmployees', String.valueOf(r.TotalNumberofEmployees_ClientIntake__c != null ? r.TotalNumberofEmployees_ClientIntake__c : 0));
             xmlOutput += xt('NumberOfEmployeesInExportingBusiness', String.valueOf(r.NumberOfEmployeesInExportingBusiness__c != null ? r.NumberOfEmployeesInExportingBusiness__c : 0));
 
@@ -172,8 +172,8 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + '</ClientAnnualIncomePart2>\n';
 
             xmlOutput += '<LegalEntity>' + xt('Code', r.LegalEntity_ClientIntake__c) + xt('Other', r.LegalEntity_Other_ClientIntake__c) + '</LegalEntity>\n';
-            xmlOutput += xt('Rural_vs_Urban', String.isBlank(r.Rural_vs_Urban__c) ? 'Undetermined' : r.Rural_vs_Urban__c);
-            xmlOutput += xt('FIPS_Code', r.FIPS_Code__c);
+            xmlOutput += xt('Rural_vs_Urban', String.isBlank(r.Rural_vs_Urban_ClientIntake__c) ? 'Undetermined' : r.Rural_vs_Urban_ClientIntake__c);
+            xmlOutput += xt('FIPS_Code', r.FIPS_Code_ClientIntake__c);
             xmlOutput += '<CounselingSeeking>' + xt('Code', r.CounselingSeeking_ClientIntake__c) + xt('Other', r.CounselingSeekingOther_ClientIntake__c) + '</CounselingSeeking>\n';
             xmlOutput += exportCountries(r.ExportCountries_ClientIntake__c);
             xmlOutput += '</ClientIntake>\n';

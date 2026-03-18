@@ -75,6 +75,12 @@ public with sharing class SBA888NormalizationHelper {
     }
 
     // ── Training partner codes ─────────────────────────────────────────────────
+    // addIfNotBlank MUST be declared before getPartnerCodes() — Apex requires
+    // private methods to be defined before their first call site.
+
+    private static void addIfNotBlank(List<String> list, String val) {
+        if (String.isNotBlank(val)) list.add(val);
+    }
 
     public static List<String> getPartnerCodes(SBA_888_Output__c r) {
         List<String> codes = new List<String>();
@@ -89,10 +95,6 @@ public with sharing class SBA888NormalizationHelper {
         addIfNotBlank(codes, r.TrainingPartners_Code_VBOC__c);
         addIfNotBlank(codes, r.TrainingPartners_Code_Women_sBusinessCtr__c);
         return codes;
-    }
-
-    private static void addIfNotBlank(List<String> list, String val) {
-        if (String.isNotBlank(val)) list.add(val);
     }
 
     // ── XML escaping ───────────────────────────────────────────────────────────

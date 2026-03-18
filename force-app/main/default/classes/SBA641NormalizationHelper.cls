@@ -44,7 +44,7 @@ public with sharing class SBA641NormalizationHelper {
     static String removeSpaceDuplicate(String token) {
         if (String.isBlank(token) || !token.contains(' ')) return token;
         for (Integer i = 1; i < token.length(); i++) {
-            if (token.charAt(i) == ' ') {
+            if (token.charAt(i) == 32) { // 32 = ASCII space; charAt() returns Integer in Apex
                 String first  = token.substring(0, i);
                 String second = token.substring(i + 1);
                 if (first.equalsIgnoreCase(second)) return first;
