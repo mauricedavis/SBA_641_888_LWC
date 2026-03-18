@@ -9,15 +9,17 @@
                 warning-count={warningCount}>
             </c-nexus-report-validation-panel>
 
-            <lightning-progress-indicator current-step={currentStepStr} type="path" has-error={hasError}>
-                <lightning-progress-step label="Select Quarter" value="1"></lightning-progress-step>
-                <lightning-progress-step label="Validate Data"  value="2"></lightning-progress-step>
-                <lightning-progress-step label="Review"         value="3"></lightning-progress-step>
-                <lightning-progress-step label="Generating"     value="4"></lightning-progress-step>
+            <lightning-progress-indicator current-step={currentStepStr} type="path">
+                <lightning-progress-step label="Select Quarter"   value="1"></lightning-progress-step>
+                <lightning-progress-step label="Extract Sessions" value="2"></lightning-progress-step>
+                <lightning-progress-step label="Validate Data"    value="3"></lightning-progress-step>
+                <lightning-progress-step label="Review"           value="4"></lightning-progress-step>
+                <lightning-progress-step label="Generate XML"     value="5"></lightning-progress-step>
             </lightning-progress-indicator>
 
             <div class="slds-m-top_medium">
 
+                <!-- Step 1: Select Quarter -->
                 <template if:true={isStep1}>
                     <div class="slds-grid slds-gutters slds-wrap">
                         <div class="slds-col slds-size_1-of-2">
@@ -26,34 +28,75 @@
                             </lightning-combobox>
                         </div>
                         <div class="slds-col slds-size_1-of-2">
-                            <lightning-combobox label="Year" value={selectedYear}
+                            <lightning-combobox label="SBA Fiscal Year" value={selectedYear}
                                 options={yearOptions} onchange={handleYearChange} required>
                             </lightning-combobox>
                         </div>
                     </div>
+                    <template if:true={dateLabel}>
+                        <div class="slds-box slds-theme_shade slds-m-top_small">
+                            <p>
+                                <lightning-icon icon-name="utility:date_time" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                                Session date range: <strong>{dateLabel}</strong>
+                            </p>
+                        </div>
+                    </template>
                     <div class="slds-m-top_medium">
-                        <lightning-button label="Validate Data →" variant="brand"
-                            onclick={handleValidate} disabled={isValidateDisabled}>
+                        <lightning-button label="Extract Sessions →" variant="brand"
+                            onclick={handleExtract} disabled={isNextDisabled}>
                         </lightning-button>
                     </div>
                 </template>
 
+                <!-- Step 2: Extract Sessions -->
                 <template if:true={isStep2}>
+                    <template if:true={isExtracting}>
+                        <div class="slds-text-align_center slds-m-vertical_medium">
+                            <lightning-spinner alternative-text="Extracting..." size="medium"></lightning-spinner>
+                            <p class="slds-m-top_small">Extracting sessions for <strong>{quarterYear}</strong></p>
+                            <p class="slds-text-color_weak slds-text-body_small">{dateLabel}</p>
+                        </div>
+                        <c-nexus-report-progress-tracker
+                            job-id={extractJobId}
+                            onjobcomplete={handleExtractComplete}>
+                        </c-nexus-report-progress-tracker>
+                    </template>
+                    <template if:false={isExtracting}>
+                        <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                            <p class="slds-text-heading_small">
+                                <lightning-icon icon-name="utility:success" size="small" variant="success" class="slds-m-right_x-small"></lightning-icon>
+                                <strong>{extractedCount}</strong> session records extracted for <strong>{quarterYear}</strong>
+                            </p>
+                            <p class="slds-text-color_weak slds-text-body_small">{dateLabel}</p>
+                        </div>
+                        <div class="slds-grid slds-gutters">
+                            <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+                            <div class="slds-col slds-text-align_right">
+                                <lightning-button label="Validate Data →" variant="brand"
+                                    onclick={handleValidate} disabled={noRecordsExtracted}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+
+                <!-- Step 3: Validate -->
+                <template if:true={isStep3}>
                     <template if:true={isValidating}>
                         <lightning-spinner alternative-text="Validating..." size="medium"></lightning-spinner>
-                        <p class="slds-m-top_small slds-text-align_center">Running validation for {quarterYear}…</p>
+                        <p class="slds-m-top_small slds-text-align_center">Running XSD validation for <strong>{quarterYear}</strong>…</p>
                     </template>
                     <template if:false={isValidating}>
                         <p class="slds-m-bottom_small">
-                            <strong>{totalRecords}</strong> records for <strong>{quarterYear}</strong>
+                            <strong>{totalRecords}</strong> records validated for <strong>{quarterYear}</strong>
                             <template if:true={hasErrors}>
-                                &nbsp;<span class="slds-badge slds-badge_error">{errorCount} Errors — must fix</span>
+                                &nbsp;<span class="slds-badge slds-badge_error">{errorCount} Error(s)</span>
                             </template>
                             <template if:true={hasWarnings}>
-                                &nbsp;<span class="slds-badge">{warningCount} Warnings</span>
+                                &nbsp;<span class="slds-badge">{warningCount} Warning(s)</span>
                             </template>
                         </p>
-                        <div class="slds-grid slds-gutters">
+                        <div class="slds-grid slds-gutters slds-m-top_medium">
                             <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
                             <div class="slds-col slds-text-align_right">
                                 <lightning-button label="Review & Confirm →" variant="brand"
@@ -64,11 +107,16 @@
                     </template>
                 </template>
 
-                <template if:true={isStep3}>
+                <!-- Step 4: Review -->
+                <template if:true={isStep4}>
                     <div class="slds-box slds-m-bottom_medium">
                         <p><strong>Quarter:</strong> {quarterYear}</p>
-                        <p><strong>Records:</strong> {totalRecords}</p>
-                        <p if:true={hasWarnings} class="slds-text-color_weak">{warningCount} warning(s) — will not block generation</p>
+                        <p><strong>Session date range:</strong> {dateLabel}</p>
+                        <p><strong>Records extracted:</strong> {extractedCount}</p>
+                        <p><strong>Records validated:</strong> {totalRecords}</p>
+                        <p if:true={hasWarnings} class="slds-text-color_weak">
+                            <strong>{warningCount}</strong> warning(s) will not block XML generation
+                        </p>
                     </div>
                     <div class="slds-grid slds-gutters">
                         <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
@@ -78,8 +126,12 @@
                     </div>
                 </template>
 
-                <template if:true={isStep4}>
-                    <c-nexus-report-progress-tracker job-id={jobId} onjobcomplete={handleJobComplete}>
+                <!-- Step 5: Generate XML -->
+                <template if:true={isStep5}>
+                    <p class="slds-m-bottom_small">Generating 641 XML for <strong>{quarterYear}</strong>…</p>
+                    <c-nexus-report-progress-tracker
+                        job-id={xmlJobId}
+                        onjobcomplete={handleJobComplete}>
                     </c-nexus-report-progress-tracker>
                 </template>
 
