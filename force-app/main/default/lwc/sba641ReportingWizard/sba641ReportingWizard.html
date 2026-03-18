@@ -70,7 +70,9 @@
                             <p class="slds-text-color_weak slds-text-body_small">{dateLabel}</p>
                         </div>
                         <div class="slds-grid slds-gutters">
-                            <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+                            <div class="slds-col">
+                                <lightning-button label="← Back" onclick={handleBack}></lightning-button>
+                            </div>
                             <div class="slds-col slds-text-align_right">
                                 <lightning-button label="Validate Data →" variant="brand"
                                     onclick={handleValidate} disabled={noRecordsExtracted}>
@@ -90,14 +92,37 @@
                         <p class="slds-m-bottom_small">
                             <strong>{totalRecords}</strong> records validated for <strong>{quarterYear}</strong>
                             <template if:true={hasErrors}>
-                                &nbsp;<span class="slds-badge slds-badge_error">{errorCount} Error(s)</span>
+                                &nbsp;<span class="slds-badge slds-badge_error">{errorCount} Error(s) — must fix</span>
                             </template>
                             <template if:true={hasWarnings}>
                                 &nbsp;<span class="slds-badge">{warningCount} Warning(s)</span>
                             </template>
                         </p>
-                        <div class="slds-grid slds-gutters slds-m-top_medium">
-                            <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+
+                        <!-- Tip when errors exist -->
+                        <template if:true={hasErrors}>
+                            <div class="slds-box slds-theme_shade slds-m-bottom_small">
+                                <p class="slds-text-body_small">
+                                    <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                                    Click a session number above to open and fix the record in a new tab, then click <strong>Re-Validate</strong> to refresh results without re-extracting.
+                                </p>
+                            </div>
+                        </template>
+
+                        <div class="slds-grid slds-gutters slds-m-top_small">
+                            <div class="slds-col">
+                                <lightning-button label="← Back" onclick={handleBack}></lightning-button>
+                            </div>
+                            <div class="slds-col">
+                                <!-- Re-Validate: re-runs validation without re-extracting -->
+                                <lightning-button
+                                    label="Re-Validate"
+                                    variant="neutral"
+                                    icon-name="utility:refresh"
+                                    onclick={handleValidate}
+                                    title="Re-run validation after fixing records — no re-extraction needed">
+                                </lightning-button>
+                            </div>
                             <div class="slds-col slds-text-align_right">
                                 <lightning-button label="Review & Confirm →" variant="brand"
                                     onclick={handleProceedToReview} disabled={hasErrors}>
@@ -115,11 +140,13 @@
                         <p><strong>Records extracted:</strong> {extractedCount}</p>
                         <p><strong>Records validated:</strong> {totalRecords}</p>
                         <p if:true={hasWarnings} class="slds-text-color_weak">
-                            <strong>{warningCount}</strong> warning(s) will not block XML generation
+                            <strong>{warningCount}</strong> warning(s) — will not block XML generation
                         </p>
                     </div>
                     <div class="slds-grid slds-gutters">
-                        <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+                        <div class="slds-col">
+                            <lightning-button label="← Back" onclick={handleBack}></lightning-button>
+                        </div>
                         <div class="slds-col slds-text-align_right">
                             <lightning-button label="Generate XML" variant="brand" onclick={handleGenerate}></lightning-button>
                         </div>
