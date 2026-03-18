@@ -17,7 +17,7 @@ public with sharing class SBA888NormalizationHelper {
         'Rural Business Development' => 'Marketing/Sales',
         'Start-up Assistance'        => 'Business Start-up/Preplanning',
         'Women-Owned Business'       => 'Marketing/Sales',
-        'Not Set'                    => 'Other', // '//Unknown/Not Stated' not in XSD enum
+        'Not Set'                    => 'Other',
         'Technology/Computers'       => 'Technology'
     };
 
@@ -28,20 +28,19 @@ public with sharing class SBA888NormalizationHelper {
     }
 
     // ── Program format ─────────────────────────────────────────────────────────
-    // XSD sample XML requires BOTH <ProgramFormat> (raw) AND <ProgramFormatType> (normalized).
 
     private static final Map<String,String> FORMAT_TYPE_MAP = new Map<String,String>{
-        'Course'        => 'Online',
-        'Webinar'       => 'Online',
-        'Teleconference'=> 'Online',
-        'On-line Course'=> 'Online',
-        'Seminar'       => 'Online'
+        'Course'         => 'Online',
+        'Webinar'        => 'Online',
+        'Teleconference' => 'Online',
+        'On-line Course' => 'Online',
+        'Seminar'        => 'Online'
     };
 
     public static String normalizeProgramFormatType(String raw) {
         if (String.isBlank(raw)) return '';
-        String m = FORMAT_TYPE_MAP.get(raw.trim());
-        return m != null ? m : raw.trim();
+        String mapped = FORMAT_TYPE_MAP.get(raw.trim());
+        return mapped != null ? mapped : raw.trim();
     }
 
     public static String getProgramFormatRaw(String raw) {
@@ -49,7 +48,6 @@ public with sharing class SBA888NormalizationHelper {
     }
 
     // ── State expansion ─────────────────────────────────────────────────────────
-    // Consolidates the duplicate state map from original SBA888Batch + SBA888_XMLBatch.
 
     private static final Map<String,String> STATE_MAP = new Map<String,String>{
         'AL'=>'Alabama','AK'=>'Alaska','AZ'=>'Arizona','AR'=>'Arkansas',
@@ -75,11 +73,12 @@ public with sharing class SBA888NormalizationHelper {
     }
 
     // ── Training partner codes ─────────────────────────────────────────────────
-    // addIfNotBlank MUST be declared before getPartnerCodes() — Apex requires
-    // private methods to be defined before their first call site.
+    // NOTE: 'list' is a reserved word in Apex — parameter named 'accumulator'
 
-    private static void addIfNotBlank(List<String> list, String val) {
-        if (String.isNotBlank(val)) list.add(val);
+    private static void addIfNotBlank(List<String> accumulator, String val) {
+        if (String.isNotBlank(val)) {
+            accumulator.add(val);
+        }
     }
 
     public static List<String> getPartnerCodes(SBA_888_Output__c r) {
