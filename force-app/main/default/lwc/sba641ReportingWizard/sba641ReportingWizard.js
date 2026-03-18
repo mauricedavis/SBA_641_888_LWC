@@ -5,6 +5,18 @@ import generateXml     from '@salesforce/apex/SBA641ReportController.generateXml
 
 const CY = new Date().getFullYear();
 
+// SBA fiscal quarters (Oct-Sept year)
+// Q1 = Oct 1 – Dec 31 | Q2 = Jan 1 – Mar 31 | Q3 = Apr 1 – Jun 30 | Q4 = Jul 1 – Sep 30
+const QUARTER_OPTIONS = [
+    { label: 'Q1 (Oct 1 – Dec 31)', value: 'Q1' },
+    { label: 'Q2 (Jan 1 – Mar 31)', value: 'Q2' },
+    { label: 'Q3 (Apr 1 – Jun 30)', value: 'Q3' },
+    { label: 'Q4 (Jul 1 – Sep 30)', value: 'Q4' }
+];
+
+const YEAR_OPTIONS = [2024, 2025, 2026, 2027, 2028, 2029, 2030]
+    .map(y => ({ label: String(y), value: String(y) }));
+
 export default class Sba641ReportingWizard extends LightningElement {
     @track currentStep       = 1;
     @track selectedQuarter   = '';
@@ -28,17 +40,8 @@ export default class Sba641ReportingWizard extends LightningElement {
     get hasWarnings()         { return this.warningCount > 0; }
     get isValidateDisabled()  { return !this.selectedQuarter || !this.selectedYear; }
 
-    get quarterOptions() {
-        return [
-            { label: 'Q1 (Jan–Mar)', value: 'Q1' },
-            { label: 'Q2 (Apr–Jun)', value: 'Q2' },
-            { label: 'Q3 (Jul–Sep)', value: 'Q3' },
-            { label: 'Q4 (Oct–Dec)', value: 'Q4' }
-        ];
-    }
-    get yearOptions() {
-        return [CY - 1, CY, CY + 1].map(y => ({ label: String(y), value: String(y) }));
-    }
+    get quarterOptions() { return QUARTER_OPTIONS; }
+    get yearOptions()    { return YEAR_OPTIONS; }
 
     handleQuarterChange(e) { this.selectedQuarter = e.detail.value; }
     handleYearChange(e)    { this.selectedYear    = e.detail.value; }
