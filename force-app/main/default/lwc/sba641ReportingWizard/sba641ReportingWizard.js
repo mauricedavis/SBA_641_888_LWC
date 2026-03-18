@@ -35,7 +35,7 @@ export default class Sba641ReportingWizard extends LightningElement {
     get isStep4() { return this.currentStep === 4; }
     get currentStepStr()      { return String(this.currentStep); }
     get showValidationPanel() { return this.currentStep >= 2 && this.validationResults.length > 0; }
-    get quarterYear()         { return this.selectedQuarter && this.selectedYear ? `${this.selectedYear}-${this.selectedQuarter}` : ''; }
+    get quarterYear()         { return this.selectedQuarter && this.selectedYear ? `${this.selectedQuarter}_${this.selectedYear}` : ''; }
     get hasErrors()           { return this.errorCount > 0; }
     get hasWarnings()         { return this.warningCount > 0; }
     get isValidateDisabled()  { return !this.selectedQuarter || !this.selectedYear; }
