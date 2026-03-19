@@ -101,7 +101,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
             xmlParts.add('<ClientRequest>\n');
             xmlParts.add('<ClientNamePart1>'
                 + xt('Last', r.LastClientNamePart1__c) + xt('First', r.FirstClientNamePart1__c)
-                + xt('Middle', r.MiddleClientNamePart1__c) + '</ClientNamePart1>\n';
+                + xt('Middle', r.MiddleClientNamePart1__c) + '</ClientNamePart1>\n');
             xmlParts.add(xt('Email', r.EmailClientRequest__c));
 
             String ph1p = SBA641NormalizationHelper.normalizePhone(r.PrimaryPhonePart1__c);
@@ -115,13 +115,13 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('State', SBA641NormalizationHelper.expandState(r.StateAddressPart1__c))
                 + xt('ZipCode', r.ZipCodeAddressPart1__c) + '<Zip4Code></Zip4Code>'
                 + '<Country>' + xt('Code', c1 != null ? c1 : '') + '</Country>'
-                + '<PostalCode></PostalCode><StateOrProvince></StateOrProvince></AddressPart1>\n';
+                + '<PostalCode></PostalCode><StateOrProvince></StateOrProvince></AddressPart1>\n');
 
             xmlParts.add(xt('SurveyAgreement', r.SurveyAgreement__c == true ? 'Yes' : 'No'));
             xmlParts.add('<ClientSignature>'
                 + xt('Date', r.DateClientSignature__c != null ? String.valueOf(r.DateClientSignature__c) : '')
                 + xt('OnFile', r.OnFileClientSignature__c == true ? 'Yes' : 'No')
-                + '</ClientSignature>\n';
+                + '</ClientSignature>\n');
             xmlParts.add('</ClientRequest>\n');
 
             // ClientIntake
@@ -169,7 +169,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('GrossRevenues', String.valueOf(r.GrossRevenues_ClientAnnualIncomePart2__c != null ? r.GrossRevenues_ClientAnnualIncomePart2__c : 0))
                 + xt('ProfitLoss', String.valueOf(r.ProfitLoss_ClientAnnualIncomePart2__c != null ? r.ProfitLoss_ClientAnnualIncomePart2__c : 0))
                 + xt('ExportGrossRevenuesOrSales', String.valueOf(r.ExportGrossRevenuesOrSales__c != null ? r.ExportGrossRevenuesOrSales__c : 0))
-                + '</ClientAnnualIncomePart2>\n';
+                + '</ClientAnnualIncomePart2>\n');
 
             xmlParts.add('<LegalEntity>' + xt('Code', r.LegalEntity_ClientIntake__c) + xt('Other', r.LegalEntity_Other_ClientIntake__c) + '</LegalEntity>\n');
             xmlParts.add(xt('Rural_vs_Urban', String.isBlank(r.Rural_vs_Urban_ClientIntake__c) ? 'Undetermined' : r.Rural_vs_Urban_ClientIntake__c));
@@ -196,7 +196,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('State', SBA641NormalizationHelper.expandState(r.State_AddressPart3__c))
                 + xt('ZipCode', r.ZipCode_AddressPart3__c) + '<Zip4Code></Zip4Code>'
                 + '<Country>' + xt('Code', c3 != null ? c3 : '') + '</Country>'
-                + '<PostalCode></PostalCode><StateOrProvince></StateOrProvince></AddressPart3>\n';
+                + '<PostalCode></PostalCode><StateOrProvince></StateOrProvince></AddressPart3>\n');
 
             xmlParts.add(xt('VerifiedToBeInBusiness', r.VerifiedToBeInBusiness_CounselorRecord__c));
             xmlParts.add(xt('ReportableImpact', r.ReportableImpact__c));
@@ -211,7 +211,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('ProfitLoss', r.ProfitLoss_ClientAnnualIncomePart3__c != null ? String.valueOf(r.ProfitLoss_ClientAnnualIncomePart3__c) : '')
                 + xt('ExportGrossRevenuesOrSales', r.ExportGrossRevenuesOrSales_Part3__c != null ? String.valueOf(r.ExportGrossRevenuesOrSales_Part3__c) : '')
                 + xt('GrowthIndicator', r.GrowthIndicator_ClientAnnualIncomePart3__c)
-                + '</ClientAnnualIncomePart3>\n';
+                + '</ClientAnnualIncomePart3>\n');
 
             xmlParts.add('<ResourcePartnerServiceContributed>'
                 + xt('SBALoanAmount', r.SBALoanAmount_CounselorRecord__c != null ? String.valueOf(r.SBALoanAmount_CounselorRecord__c) : '')
@@ -221,7 +221,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('NonSBALoanAmountTxnNmb', r.NonSBALoanAmountTxnNmbCounselorRecord__c != null ? String.valueOf(r.NonSBALoanAmountTxnNmbCounselorRecord__c) : '')
                 + xt('EquityCapitalReceivedTxnNmb', r.EquityCapitalReceivedTxnNmbCounselorRec__c != null ? String.valueOf(r.EquityCapitalReceivedTxnNmbCounselorRec__c) : '')
                 + '<NumberOfContractsReceived></NumberOfContractsReceived>'
-                + '</ResourcePartnerServiceContributed>\n';
+                + '</ResourcePartnerServiceContributed>\n');
 
             if (String.isBlank(r.Certifications_CounselorRecord__c)) {
                 xmlParts.add('<Certifications />\n');
@@ -236,7 +236,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
             xmlParts.add('<CounselingProvided>'
                 + xt('Code', r.CounselingProvided_CounselorRecord__c)
                 + xt('Other', r.CounselingProvidedOtherCounselorRecord__c)
-                + '</CounselingProvided>\n';
+                + '</CounselingProvided>\n');
 
             if (String.isBlank(r.ReferredClient_CounselorRecord__c)) {
                 xmlParts.add('<ReferredClient />\n');
@@ -244,7 +244,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 xmlParts.add('<ReferredClient>'
                     + xt('Code', r.ReferredClient_CounselorRecord__c)
                     + xt('Other', r.ReferredClientOther_CounselorRecord__c)
-                    + '</ReferredClient>\n';
+                    + '</ReferredClient>\n');
             }
 
             xmlParts.add(xt('SessionType', r.SessionType_CounselorRecord__c));
@@ -258,7 +258,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('Contact', String.valueOf(chrs))
                 + xt('Prepare', r.CounselingHours_Prepare__c != null ? String.valueOf(r.CounselingHours_Prepare__c) : '')
                 + xt('Travel',  r.CounselingHours_Travel__c  != null ? String.valueOf(r.CounselingHours_Travel__c)  : '')
-                + '</CounselingHours>\n';
+                + '</CounselingHours>\n');
 
             xmlParts.add(xt('CounselorNotes', r.CounselorNotes_CounselorRecord__c));
             xmlParts.add(exportCountries(r.ExportCountries_CounselorRecord__c));
@@ -268,7 +268,7 @@ public with sharing class SBA641_XMLBatch_REFACTORED
                 + xt('PartnerTrainingNumber', r.PartnerTrainingNumber_CounselorRecord__c)
                 + xt('EmployeesTrained', r.EmployeesTrained_CounselorRecord__c != null ? String.valueOf(r.EmployeesTrained_CounselorRecord__c) : '')
                 + xt('HoursTrained', r.HoursTrained_CounselorRecord__c != null ? String.valueOf(r.HoursTrained_CounselorRecord__c) : '')
-                + '</TrainingSession>\n';
+                + '</TrainingSession>\n');
 
             xmlParts.add('</CounselorRecord>\n</CounselingRecord>\n');
         }
