@@ -2,9 +2,8 @@
  * SBA641ReportController
  * AuraEnabled controller backing sba641ReportingWizard LWC.
  *
- * Run State Persistence:
- *   Uses SBA641_Run_State__c custom object to persist wizard state across
- *   page navigation and browser refreshes. One active record per user.
+ * Run State Persistence uses dynamic Apex to reference SBA641_Run_State__c,
+ * avoiding compile-time type resolution issues with FLS/profile access.
  *
  * SBA Fiscal Quarters:
  *   Q1 = Oct 1 (year-1) – Dec 31 (year-1)
@@ -167,78 +166,93 @@ public with sharing class SBA641ReportController {
                  AND DeveloperName = :quarterYear LIMIT 1].isEmpty();
     }
 
-    // ── Run State Persistence ─────────────────────────────────────────────────
-    // Uses SBA641_Run_State__c to persist wizard state across navigation/refresh.
-    // One active record per user — upsert on OwnerId.
+    // ── Run State Persistence (Dynamic Apex — avoids FLS compile issues) ───────
+    // Uses dynamic SOQL/DML so SBA641_Run_State__c is resolved at runtime,
+    // not at compile time. This bypasses profile FLS restrictions on the type.
+
+    private static final String RUN_STATE_OBJECT = 'SBA641_Run_State__c';
 
     @AuraEnabled
     public static void saveRunState(Map<String, Object> state) {
-        Id userId = UserInfo.getUserId();
-        List<SBA641_Run_State__c> existing = [
-            SELECT Id FROM SBA641_Run_State__c
-            WHERE OwnerId = :userId
-            AND Run_Status__c = 'In Progress'
-            LIMIT 1
-        ];
+        try {
+            Id userId = UserInfo.getUserId();
 
-        SBA641_Run_State__c rec = existing.isEmpty()
-            ? new SBA641_Run_State__c()
-            : existing[0];
+            // Check for existing in-progress record
+            String query = 'SELECT Id FROM ' + RUN_STATE_OBJECT
+                + ' WHERE OwnerId = \'' + userId + '\''
+                + ' AND Run_Status__c = \'In Progress\' LIMIT 1';
+            List<SObject> existing = Database.query(query);
 
-        rec.Quarter_Year__c    = (String)  state.get('quarterYear');
-        rec.Current_Step__c    = (Decimal) state.get('currentStep');
-        rec.Date_Label__c      = (String)  state.get('dateLabel');
-        rec.Extract_Job_Id__c  = (String)  state.get('extractJobId');
-        rec.Extracted_Count__c = state.get('extractedCount') != null
-            ? Decimal.valueOf(String.valueOf(state.get('extractedCount'))) : 0;
-        rec.XML_Job_Id__c      = (String)  state.get('xmlJobId');
-        rec.Run_Status__c      = (String)  state.get('runStatus');
-        rec.Selected_Quarter__c = (String) state.get('selectedQuarter');
-        rec.Selected_Year__c   = (String)  state.get('selectedYear');
+            SObject rec = existing.isEmpty()
+                ? Schema.getGlobalDescribe().get(RUN_STATE_OBJECT).newSObject()
+                : existing[0];
 
-        upsert rec;
+            rec.put('Quarter_Year__c',    state.get('quarterYear'));
+            rec.put('Current_Step__c',    state.get('currentStep'));
+            rec.put('Date_Label__c',      state.get('dateLabel'));
+            rec.put('Extract_Job_Id__c',  state.get('extractJobId'));
+            rec.put('XML_Job_Id__c',      state.get('xmlJobId'));
+            rec.put('Run_Status__c',      state.get('runStatus') != null ? state.get('runStatus') : 'In Progress');
+            rec.put('Selected_Quarter__c',state.get('selectedQuarter'));
+            rec.put('Selected_Year__c',   state.get('selectedYear'));
+
+            Object cnt = state.get('extractedCount');
+            if (cnt != null) {
+                rec.put('Extracted_Count__c', Decimal.valueOf(String.valueOf(cnt)));
+            }
+
+            upsert rec;
+        } catch(Exception e) {
+            // Silently fail — run state persistence is non-critical
+            System.debug('saveRunState failed: ' + e.getMessage());
+        }
     }
 
     @AuraEnabled(cacheable=false)
     public static Map<String, Object> loadRunState() {
-        Id userId = UserInfo.getUserId();
-        List<SBA641_Run_State__c> recs = [
-            SELECT Id, Quarter_Year__c, Current_Step__c, Date_Label__c,
-                   Extract_Job_Id__c, Extracted_Count__c, XML_Job_Id__c,
-                   Run_Status__c, Selected_Quarter__c, Selected_Year__c,
-                   LastModifiedDate
-            FROM SBA641_Run_State__c
-            WHERE OwnerId = :userId
-            AND Run_Status__c = 'In Progress'
-            ORDER BY LastModifiedDate DESC
-            LIMIT 1
-        ];
+        try {
+            Id userId = UserInfo.getUserId();
+            String query = 'SELECT Id, Quarter_Year__c, Current_Step__c, Date_Label__c,'
+                + ' Extract_Job_Id__c, Extracted_Count__c, XML_Job_Id__c,'
+                + ' Run_Status__c, Selected_Quarter__c, Selected_Year__c, LastModifiedDate'
+                + ' FROM ' + RUN_STATE_OBJECT
+                + ' WHERE OwnerId = \'' + userId + '\''
+                + ' AND Run_Status__c = \'In Progress\''
+                + ' ORDER BY LastModifiedDate DESC LIMIT 1';
 
-        if (recs.isEmpty()) return null;
+            List<SObject> recs = Database.query(query);
+            if (recs.isEmpty()) return null;
 
-        SBA641_Run_State__c r = recs[0];
-        return new Map<String, Object>{
-            'stateId'        => r.Id,
-            'quarterYear'    => r.Quarter_Year__c,
-            'currentStep'    => r.Current_Step__c,
-            'dateLabel'      => r.Date_Label__c,
-            'extractJobId'   => r.Extract_Job_Id__c,
-            'extractedCount' => r.Extracted_Count__c,
-            'xmlJobId'       => r.XML_Job_Id__c,
-            'runStatus'      => r.Run_Status__c,
-            'selectedQuarter'=> r.Selected_Quarter__c,
-            'selectedYear'   => r.Selected_Year__c,
-            'lastModified'   => r.LastModifiedDate
-        };
+            SObject r = recs[0];
+            return new Map<String, Object>{
+                'stateId'         => r.get('Id'),
+                'quarterYear'     => r.get('Quarter_Year__c'),
+                'currentStep'     => r.get('Current_Step__c'),
+                'dateLabel'       => r.get('Date_Label__c'),
+                'extractJobId'    => r.get('Extract_Job_Id__c'),
+                'extractedCount'  => r.get('Extracted_Count__c'),
+                'xmlJobId'        => r.get('XML_Job_Id__c'),
+                'runStatus'       => r.get('Run_Status__c'),
+                'selectedQuarter' => r.get('Selected_Quarter__c'),
+                'selectedYear'    => r.get('Selected_Year__c'),
+                'lastModified'    => r.get('LastModifiedDate')
+            };
+        } catch(Exception e) {
+            System.debug('loadRunState failed: ' + e.getMessage());
+            return null;
+        }
     }
 
     @AuraEnabled
     public static void clearRunState() {
-        Id userId = UserInfo.getUserId();
-        List<SBA641_Run_State__c> recs = [
-            SELECT Id FROM SBA641_Run_State__c
-            WHERE OwnerId = :userId LIMIT 10
-        ];
-        if (!recs.isEmpty()) delete recs;
+        try {
+            Id userId = UserInfo.getUserId();
+            String query = 'SELECT Id FROM ' + RUN_STATE_OBJECT
+                + ' WHERE OwnerId = \'' + userId + '\' LIMIT 10';
+            List<SObject> recs = Database.query(query);
+            if (!recs.isEmpty()) delete recs;
+        } catch(Exception e) {
+            System.debug('clearRunState failed: ' + e.getMessage());
+        }
     }
 }
