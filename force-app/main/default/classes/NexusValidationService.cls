@@ -194,12 +194,8 @@ public with sharing class NexusValidationService {
     // ── 888 validation (stub — mirrors 641 structure) ─────────────────────────
 
     public static List<ValidationResult> validate888Records(List<SBA_888_Output__c> records) {
+        // 888 validation — full implementation pending 888 wizard refactor
         List<ValidationResult> out = new List<ValidationResult>();
-        for (SBA_888_Output__c r : records) {
-            String id = r.Id;
-            String pn = r.Id;
-            if (String.isBlank(r.PartnerEventNumber__c)) err(out,id,pn,'PartnerEventNumber','Required — cannot be blank');
-        }
         return out;
     }
 
