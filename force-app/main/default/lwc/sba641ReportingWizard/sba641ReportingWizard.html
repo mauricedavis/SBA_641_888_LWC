@@ -2,27 +2,6 @@
     <lightning-card title="SBA 641 Counseling Report" icon-name="standard:report">
         <div class="slds-p-around_medium">
 
-            <!-- ── Resume Banner ─────────────────────────────────────────── -->
-            <template if:true={showResumeBanner}>
-                <div class="slds-notify slds-notify_alert slds-theme_info slds-m-bottom_medium" role="alert">
-                    <span class="slds-assistive-text">Info</span>
-                    <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-                    <strong>Active run found:</strong>&nbsp;{resumeLabel}
-                    <span class="slds-text-color_weak slds-m-left_x-small slds-text-body_small">
-                        Last updated: {resumeLastModified}
-                    </span>
-                    <div class="slds-m-top_x-small">
-                        <lightning-button label="Resume Where I Left Off" variant="brand"
-                            onclick={handleResume} class="slds-m-right_x-small">
-                        </lightning-button>
-                        <lightning-button label="Start Fresh" variant="neutral"
-                            onclick={handleDismissResume}>
-                        </lightning-button>
-                    </div>
-                </div>
-            </template>
-
-            <!-- ── Validation Panel ──────────────────────────────────────── -->
             <c-nexus-report-validation-panel
                 if:true={showValidationPanel}
                 validation-results={validationResults}
@@ -30,7 +9,6 @@
                 warning-count={warningCount}>
             </c-nexus-report-validation-panel>
 
-            <!-- ── Progress Indicator ────────────────────────────────────── -->
             <lightning-progress-indicator current-step={currentStepStr} type="path">
                 <lightning-progress-step label="Select Quarter"   value="1"></lightning-progress-step>
                 <lightning-progress-step label="Extract Sessions" value="2"></lightning-progress-step>
@@ -63,11 +41,31 @@
                             </p>
                         </div>
                     </template>
-                    <div class="slds-m-top_medium">
-                        <lightning-button label="Extract Sessions &#x2192;" variant="brand"
-                            onclick={handleExtract} disabled={isNextDisabled}>
-                        </lightning-button>
-                    </div>
+
+                    <!-- Existing records banner -->
+                    <template if:true={existingRecordCount}>
+                        <div class="slds-notify slds-notify_alert slds-theme_info slds-m-top_small" role="alert">
+                            <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                            <strong>{existingRecordCount}</strong> extracted records already exist for <strong>{quarterYear}</strong>.
+                            Skip extraction and go straight to validation?
+                            <div class="slds-m-top_x-small">
+                                <lightning-button label="Go to Validate &#x2192;" variant="brand"
+                                    onclick={handleSkipToValidate} class="slds-m-right_x-small">
+                                </lightning-button>
+                                <lightning-button label="Re-Extract (replaces existing)" variant="neutral"
+                                    onclick={handleExtract}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template if:false={existingRecordCount}>
+                        <div class="slds-m-top_medium">
+                            <lightning-button label="Extract Sessions &#x2192;" variant="brand"
+                                onclick={handleExtract} disabled={isNextDisabled}>
+                            </lightning-button>
+                        </div>
+                    </template>
                 </template>
 
                 <!-- Step 2: Extract Sessions -->
@@ -176,12 +174,11 @@
 
             </div>
 
-            <!-- ── Start Over (always visible after step 1) ──────────────── -->
+            <!-- Start Over -->
             <template if:false={isStep1}>
                 <div class="slds-m-top_large slds-border_top slds-p-top_small">
                     <lightning-button label="Start Over" variant="destructive-text"
-                        icon-name="utility:undo" onclick={handleStartOver}
-                        title="Clear all state and start a new run">
+                        icon-name="utility:undo" onclick={handleStartOver}>
                     </lightning-button>
                 </div>
             </template>

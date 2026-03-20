@@ -22,76 +22,54 @@ const YEAR_OPTIONS = [2024, 2025, 2026, 2027, 2028, 2029, 2030]
 
 export default class Sba641ReportingWizard extends LightningElement {
 
-    // ── State ──────────────────────────────────────────────────────────────────
-    @track currentStep        = 1;
-    @track selectedQuarter    = '';
-    @track selectedYear       = String(new Date().getFullYear());
-    @track dateLabel          = '';
-
-    // Resume banner
-    @track showResumeBanner   = false;
-    @track resumeLabel        = '';
-    @track resumeLastModified = '';
+    @track currentStep         = 1;
+    @track selectedQuarter     = '';
+    @track selectedYear        = String(new Date().getFullYear());
+    @track dateLabel           = '';
+    @track existingRecordCount = 0;
 
     // Step 2 — Extract
-    @track isExtracting       = false;
-    @track extractJobId       = null;
-    @track extractedCount     = 0;
+    @track isExtracting        = false;
+    @track extractJobId        = null;
+    @track extractedCount      = 0;
 
     // Step 3 — Validate
-    @track isValidating       = false;
-    @track totalRecords       = 0;
-    @track errorCount         = 0;
-    @track warningCount       = 0;
-    @track validationResults  = [];
+    @track isValidating        = false;
+    @track totalRecords        = 0;
+    @track errorCount          = 0;
+    @track warningCount        = 0;
+    @track validationResults   = [];
 
     // Step 5 — Generate
-    @track xmlJobId           = null;
+    @track xmlJobId            = null;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
     connectedCallback() {
-        this._checkForActiveRun();
+        this._tryLoadRunState();
     }
 
-    async _checkForActiveRun() {
+    async _tryLoadRunState() {
         try {
             const state = await loadRunState();
             if (state && state.currentStep > 1) {
-                this.showResumeBanner   = true;
-                this.resumeLabel        = `${state.quarterYear} — Step ${state.currentStep}`;
-                this.resumeLastModified = state.lastModified
-                    ? new Date(state.lastModified).toLocaleString() : '';
-                // Store state for resume
-                this._pendingState = state;
+                this.selectedQuarter  = state.selectedQuarter || '';
+                this.selectedYear     = state.selectedYear    || String(new Date().getFullYear());
+                this.dateLabel        = state.dateLabel       || '';
+                this.extractJobId     = state.extractJobId    || null;
+                this.extractedCount   = state.extractedCount  || 0;
+                this.xmlJobId         = state.xmlJobId        || null;
+                this.currentStep      = state.currentStep     || 1;
+                if (this.currentStep === 2 && this.extractJobId) this.isExtracting = true;
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Run Restored',
+                    message: `Resumed ${state.quarterYear} at Step ${state.currentStep}`,
+                    variant: 'info'
+                }));
             }
-        } catch(e) {
-            // No active run — start fresh
-        }
+        } catch(e) { /* no active run */ }
     }
 
-    handleResume() {
-        const s = this._pendingState;
-        if (!s) return;
-        this.selectedQuarter   = s.selectedQuarter || '';
-        this.selectedYear      = s.selectedYear    || String(new Date().getFullYear());
-        this.dateLabel         = s.dateLabel        || '';
-        this.extractJobId      = s.extractJobId     || null;
-        this.extractedCount    = s.extractedCount   || 0;
-        this.xmlJobId          = s.xmlJobId         || null;
-        this.currentStep       = s.currentStep      || 1;
-        this.showResumeBanner  = false;
-        this._pendingState     = null;
-        // If we're resuming mid-extraction or mid-generation, restart polling
-        if (this.currentStep === 2 && this.extractJobId) this.isExtracting = true;
-        if (this.currentStep === 5 && this.xmlJobId) { /* tracker auto-polls */ }
-    }
-
-    handleDismissResume() {
-        this.showResumeBanner = false;
-        this._pendingState    = null;
-    }
-
-    // ── Auto-save helper ───────────────────────────────────────────────────────
+    // ── Auto-save ──────────────────────────────────────────────────────────────
     async _save(runStatus) {
         try {
             await saveRunState({
@@ -107,9 +85,7 @@ export default class Sba641ReportingWizard extends LightningElement {
                     selectedYear:    this.selectedYear
                 }
             });
-        } catch(e) {
-            console.error('Failed to save run state:', e);
-        }
+        } catch(e) { console.error('saveRunState failed:', e); }
     }
 
     // ── Step visibility ────────────────────────────────────────────────────────
@@ -120,8 +96,6 @@ export default class Sba641ReportingWizard extends LightningElement {
     get isStep5() { return this.currentStep === 5; }
     get currentStepStr()      { return String(this.currentStep); }
     get showValidationPanel() { return this.currentStep >= 3 && this.validationResults.length > 0; }
-
-    // ── Computed ───────────────────────────────────────────────────────────────
     get quarterYear() {
         return this.selectedQuarter && this.selectedYear
             ? `${this.selectedQuarter}_${this.selectedYear}` : '';
@@ -142,12 +116,27 @@ export default class Sba641ReportingWizard extends LightningElement {
         this.selectedYear = e.detail.value;
         this._updateDateLabel();
     }
+
     async _updateDateLabel() {
         if (!this.selectedQuarter || !this.selectedYear) return;
         try {
             const dates = await getQuarterDates({ quarterYear: this.quarterYear });
             this.dateLabel = dates.label;
-        } catch(e) { this.dateLabel = ''; }
+            // Check for existing output records
+            const cnt = await getOutputCount({ quarterYear: this.quarterYear });
+            this.existingRecordCount = cnt || 0;
+        } catch(e) {
+            this.dateLabel = '';
+            this.existingRecordCount = 0;
+        }
+    }
+
+    // Skip extraction — jump straight to validate using existing records
+    async handleSkipToValidate() {
+        this.extractedCount = this.existingRecordCount;
+        this.currentStep    = 3;
+        await this._save('In Progress');
+        await this.handleValidate();
     }
 
     async handleExtract() {
@@ -155,13 +144,14 @@ export default class Sba641ReportingWizard extends LightningElement {
         if (!rtOk) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Record Type Missing',
-                message: `No Record Type "${this.quarterYear}" exists on SBA 641 Output. Please create it in Setup.`,
+                message: `No Record Type "${this.quarterYear}" exists on SBA 641 Output.`,
                 variant: 'error', mode: 'sticky'
             }));
             return;
         }
-        this.currentStep  = 2;
-        this.isExtracting = true;
+        this.currentStep         = 2;
+        this.isExtracting        = true;
+        this.existingRecordCount = 0;
         await this._save('In Progress');
         try {
             this.extractJobId = await extractSessions({ quarterYear: this.quarterYear });
@@ -176,7 +166,6 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-    // ── Step 2: Extract complete ───────────────────────────────────────────────
     async handleExtractComplete(e) {
         const { status } = e.detail;
         this.isExtracting = false;
@@ -186,21 +175,20 @@ export default class Sba641ReportingWizard extends LightningElement {
             if (this.extractedCount === 0) {
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'No Records Found',
-                    message: `No sessions found for ${this.quarterYear}. Check the date range or session data.`,
+                    message: `No sessions found for ${this.quarterYear}.`,
                     variant: 'warning', mode: 'sticky'
                 }));
             }
         } else {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Extraction Failed',
-                message: `Batch job ended with status: ${status}`,
+                message: `Batch ended with status: ${status}`,
                 variant: 'error'
             }));
         }
         await this._save('In Progress');
     }
 
-    // ── Step 3: Validate ───────────────────────────────────────────────────────
     async handleValidate() {
         this.currentStep  = 3;
         this.isValidating = true;
@@ -227,7 +215,6 @@ export default class Sba641ReportingWizard extends LightningElement {
         await this._save('In Progress');
     }
 
-    // ── Step 5: Generate XML ───────────────────────────────────────────────────
     async handleGenerate() {
         try {
             this.xmlJobId = await generateXml({
@@ -249,7 +236,7 @@ export default class Sba641ReportingWizard extends LightningElement {
         this.dispatchEvent(new ShowToastEvent({
             title:   status === 'Completed' ? '\u2705 XML Generated' : 'Generation Failed',
             message: status === 'Completed'
-                ? `641 XML for ${this.quarterYear} generated and emailed to you.`
+                ? `641 XML for ${this.quarterYear} generated and emailed.`
                 : `Batch ended with status: ${status}`,
             variant: status === 'Completed' ? 'success' : 'error',
             mode: 'sticky'
@@ -264,16 +251,16 @@ export default class Sba641ReportingWizard extends LightningElement {
     }
 
     async handleStartOver() {
-        await clearRunState();
-        this.currentStep       = 1;
-        this.selectedQuarter   = '';
-        this.dateLabel         = '';
-        this.extractJobId      = null;
-        this.extractedCount    = 0;
-        this.xmlJobId          = null;
-        this.validationResults = [];
-        this.errorCount        = 0;
-        this.warningCount      = 0;
-        this.showResumeBanner  = false;
+        try { await clearRunState(); } catch(e) {}
+        this.currentStep         = 1;
+        this.selectedQuarter     = '';
+        this.dateLabel           = '';
+        this.existingRecordCount = 0;
+        this.extractJobId        = null;
+        this.extractedCount      = 0;
+        this.xmlJobId            = null;
+        this.validationResults   = [];
+        this.errorCount          = 0;
+        this.warningCount        = 0;
     }
 }
