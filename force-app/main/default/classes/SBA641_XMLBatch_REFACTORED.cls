@@ -21,27 +21,29 @@ public with sharing class SBA641_XMLBatch_REFACTORED
 
     private String varQuarterYear;
     private String varReportType;
-    private String ownerEmail  = '';
-    private Id     docId; // Id of Document used as rolling XML buffer
+    private String ownerEmail   = '';
+    private Integer chunkIndex  = 0;
+    private List<Id> chunkCVIds = new List<Id>(); // ContentVersion Id per execute() chunk
 
     public SBA641_XMLBatch_REFACTORED(String varQuarterYear, String varReportType) {
         this.varQuarterYear = varQuarterYear;
         this.varReportType  = varReportType;
     }
 
-    @TestVisible public String getXmlOutput() { return docId != null ? [SELECT Body FROM Document WHERE Id = :docId LIMIT 1].Body.toString() : ''; }
+    @TestVisible public String getXmlOutput() { return ''; } // chunks stored in ContentVersion
 
     // ── FIXED: root emitted exactly once here ─────────────────────────────────
     public Database.QueryLocator start(Database.BatchableContext bc) {
         ownerEmail = [SELECT Email FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1].Email;
-        // Create rolling Document buffer — stores XML chunks to avoid stateful memory limit
-        Document doc = new Document();
-        doc.Name       = 'SBA641_XML_Buffer_' + varQuarterYear;
-        doc.FolderId   = UserInfo.getUserId(); // personal documents folder
-        doc.Body       = Blob.valueOf('<?xml version="1.0" encoding="UTF-8"?>\n<CounselingInformation xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n');
-        doc.ContentType = 'text/xml';
-        insert doc;
-        docId = doc.Id;
+        // Store XML header as chunk 0
+        ContentVersion cv0 = new ContentVersion();
+        cv0.Title          = 'SBA641_XML_Chunk_' + varQuarterYear + '_000';
+        cv0.PathOnClient   = cv0.Title + '.txt';
+        cv0.VersionData    = Blob.valueOf('<?xml version="1.0" encoding="UTF-8"?>\n<CounselingInformation xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n');
+        cv0.IsMajorVersion = false;
+        insert cv0;
+        chunkCVIds.add(cv0.Id);
+        chunkIndex = 1;
 
         return Database.getQueryLocator(
             'SELECT PartnerClientNumber__c, LocationCode__c,' +
@@ -279,22 +281,40 @@ public with sharing class SBA641_XMLBatch_REFACTORED
 
             chunk.add('</CounselorRecord>\n</CounselingRecord>\n');
         }
-        // Append this chunk to the rolling Document buffer
-        if (docId != null && !chunk.isEmpty()) {
-            Document doc = [SELECT Body FROM Document WHERE Id = :docId LIMIT 1];
-            doc.Body = Blob.valueOf(doc.Body.toString() + String.join(chunk, ''));
-            update doc;
+        // Save this chunk as a new ContentVersion (avoids 5MB Document limit)
+        if (!chunk.isEmpty()) {
+            String padded = String.valueOf(chunkIndex).leftPad(3, '0');
+            ContentVersion cv = new ContentVersion();
+            cv.Title          = 'SBA641_XML_Chunk_' + varQuarterYear + '_' + padded;
+            cv.PathOnClient   = cv.Title + '.txt';
+            cv.VersionData    = Blob.valueOf(String.join(chunk, ''));
+            cv.IsMajorVersion = false;
+            insert cv;
+            chunkCVIds.add(cv.Id);
+            chunkIndex++;
         }
     }
 
     // ── FIXED: close root here only ───────────────────────────────────────────
     public void finish(Database.BatchableContext bc) {
-        // Read complete XML from Document buffer, close root, then clean up
+        // Assemble full XML from ordered chunks + closing tag
         String fullXml = '';
-        if (docId != null) {
-            Document doc = [SELECT Body FROM Document WHERE Id = :docId LIMIT 1];
-            fullXml = doc.Body.toString() + '</CounselingInformation>\n';
-            delete doc; // clean up temp buffer
+        if (!chunkCVIds.isEmpty()) {
+            List<ContentVersion> chunks = [
+                SELECT Title, VersionData FROM ContentVersion
+                WHERE Id IN :chunkCVIds
+                ORDER BY Title ASC
+            ];
+            List<String> parts = new List<String>();
+            for (ContentVersion cv : chunks) {
+                parts.add(cv.VersionData.toString());
+            }
+            parts.add('</CounselingInformation>\n');
+            fullXml = String.join(parts, '');
+            // Clean up temp chunks
+            List<ContentDocument> docs = [SELECT Id FROM ContentDocument
+                WHERE Id IN (SELECT ContentDocumentId FROM ContentVersion WHERE Id IN :chunkCVIds)];
+            if (!docs.isEmpty()) delete docs;
         }
 
         SBA641_XML_Upload__c rec = new SBA641_XML_Upload__c();
