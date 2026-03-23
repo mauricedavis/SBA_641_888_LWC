@@ -1,187 +1,240 @@
 /**
  * SBA641_XMLAssembler
- * Queueable job that assembles ContentVersion XML chunks into a final file
- * by chaining itself — one chunk per execution to stay within heap limits.
+ * Assembles XML chunks into a final ContentVersion using the Salesforce
+ * Files REST API chunked upload (Content-Range). Each execution uploads
+ * one chunk without holding accumulated content in heap.
  *
- * Strategy:
- *   - Processes chunks in Title order (000, 001, 002 ... 999_CLOSE)
- *   - First execution creates the ContentVersion with chunk 0 data
- *   - Subsequent executions PATCH the ContentVersion body by re-creating it
- *     with accumulated content (for small totals) OR chains to next chunk
- *   - When all chunks processed: attaches to SBA641_XML_Upload__c and emails
- *
- * For very large files (>6MB), uses a two-pass approach:
- *   Pass 1: Collect all chunk Ids in order (already have them)
- *   Pass 2: Read 2 chunks at a time, write to a running ContentVersion
- *           by inserting new versions (ContentVersion is immutable after insert)
- *
- * Note: Salesforce ContentVersion body is immutable after insert.
- * The only way to "append" is to read all previous data + new chunk and
- * insert a new ContentVersion. This works for files up to ~6MB per transaction.
- *
- * For files larger than ~6MB: splits into multiple ContentVersion files
- * and notifies the user to concatenate them.
+ * Flow:
+ *   1. First execution: initiate upload, get ContentVersion Id
+ *   2. Each subsequent execution: PATCH one chunk with Content-Range header
+ *   3. Final execution: finalize, link to SBA641_XML_Upload__c, email
  */
 public class SBA641_XMLAssembler implements Queueable, Database.AllowsCallouts {
 
-    private List<Id> chunkCVIds;
-    private Integer  currentIndex;
-    private String   varQuarterYear;
-    private String   ownerEmail;
-    private Id       assembledCVId;   // ContentVersion being built
-    private Blob     accumulatedData; // running XML blob (limited by heap)
+    private List<Id>  chunkCVIds;
+    private Integer   currentIndex;
+    private String    varQuarterYear;
+    private String    ownerEmail;
+    private Id        targetCVId;       // ContentVersion being built via REST
+    private Id        targetDocId;      // ContentDocument Id
+    private Long      bytesUploaded;    // running byte offset for Content-Range
+    private Long      totalBytes;       // total file size (calculated on first pass)
 
-    private static final Integer MAX_HEAP_BYTES = 5000000; // 5MB safe threshold
-
+    // ── Constructor (initial) ──────────────────────────────────────────────────
     public SBA641_XMLAssembler(List<Id> chunkCVIds, String varQuarterYear, String ownerEmail) {
-        this.chunkCVIds     = chunkCVIds;
-        this.currentIndex   = 0;
+        this.chunkCVIds    = chunkCVIds;
+        this.currentIndex  = 0;
         this.varQuarterYear = varQuarterYear;
-        this.ownerEmail     = ownerEmail;
-        this.accumulatedData = Blob.valueOf('');
+        this.ownerEmail    = ownerEmail;
+        this.bytesUploaded = 0;
+        this.totalBytes    = -1; // calculated on first run
     }
 
-    // Chaining constructor
+    // ── Constructor (chaining) ─────────────────────────────────────────────────
     private SBA641_XMLAssembler(List<Id> chunkCVIds, Integer currentIndex,
             String varQuarterYear, String ownerEmail,
-            Id assembledCVId, Blob accumulatedData) {
-        this.chunkCVIds      = chunkCVIds;
-        this.currentIndex    = currentIndex;
-        this.varQuarterYear  = varQuarterYear;
-        this.ownerEmail      = ownerEmail;
-        this.assembledCVId   = assembledCVId;
-        this.accumulatedData = accumulatedData;
+            Id targetCVId, Id targetDocId,
+            Long bytesUploaded, Long totalBytes) {
+        this.chunkCVIds    = chunkCVIds;
+        this.currentIndex  = currentIndex;
+        this.varQuarterYear = varQuarterYear;
+        this.ownerEmail    = ownerEmail;
+        this.targetCVId    = targetCVId;
+        this.targetDocId   = targetDocId;
+        this.bytesUploaded = bytesUploaded;
+        this.totalBytes    = totalBytes;
     }
 
     public void execute(QueueableContext ctx) {
-        // Query chunks in batches of 3 at a time to build up accumulated content
-        Integer batchSize  = 3;
-        Integer endIndex   = Math.min(currentIndex + batchSize, chunkCVIds.size());
-        List<Id> batchIds  = new List<Id>();
-        for (Integer i = currentIndex; i < endIndex; i++) {
-            batchIds.add(chunkCVIds[i]);
-        }
-
-        // Read this batch of chunks ordered by title
-        List<ContentVersion> chunks = [
-            SELECT Title, VersionData FROM ContentVersion
-            WHERE Id IN :batchIds
-            ORDER BY Title ASC
-        ];
-
-        // Accumulate chunk data
-        String accumulated = accumulatedData.toString();
-        for (ContentVersion cv : chunks) {
-            accumulated += cv.VersionData.toString();
-        }
-
-        Integer nextIndex = endIndex;
-        Boolean isDone    = (nextIndex >= chunkCVIds.size());
-
-        if (isDone) {
-            // All chunks processed — write final ContentVersion
-            Blob finalBlob = Blob.valueOf(accumulated);
-            finalizeXml(finalBlob);
-
-            // Clean up temp chunks
-            try {
-                List<ContentDocument> docs = [
-                    SELECT Id FROM ContentDocument
-                    WHERE Id IN (
-                        SELECT ContentDocumentId FROM ContentVersion
-                        WHERE Id IN :chunkCVIds
-                    )
-                ];
-                if (!docs.isEmpty()) delete docs;
-            } catch(Exception e) {
-                System.debug('Chunk cleanup failed: ' + e.getMessage());
-            }
-        } else {
-            // Check if we're approaching heap limit — if so, write partial file
-            Integer approxSize = accumulated.length();
-            if (approxSize > MAX_HEAP_BYTES) {
-                // Write what we have so far as a partial file and notify
-                Blob partialBlob = Blob.valueOf(accumulated);
-                writePartialFile(partialBlob, currentIndex);
-
-                // Notify user and stop — they'll need to concatenate
-                sendPartialNotification();
-                return;
+        try {
+            // On first run, calculate total size across all chunks
+            if (totalBytes < 0) {
+                totalBytes = calculateTotalSize();
+                if (totalBytes <= 0) {
+                    sendEmail('SBA641 XML Assembly Failed',
+                        'Could not calculate total XML size for ' + varQuarterYear);
+                    return;
+                }
             }
 
-            // Chain to next batch
-            System.enqueueJob(new SBA641_XMLAssembler(
-                chunkCVIds, nextIndex, varQuarterYear, ownerEmail,
-                assembledCVId, Blob.valueOf(accumulated)
-            ));
+            // Read current chunk
+            Id chunkId = chunkCVIds[currentIndex];
+            ContentVersion chunk = [SELECT Title, VersionData FROM ContentVersion
+                                    WHERE Id = :chunkId LIMIT 1];
+            Blob chunkData = chunk.VersionData;
+            Long chunkSize = chunkData.size();
+            Long rangeEnd  = bytesUploaded + chunkSize - 1;
+
+            String baseUrl = URL.getOrgDomainUrl().toExternalForm();
+
+            if (targetCVId == null) {
+                // First chunk — create ContentVersion via multipart POST
+                String boundary = 'boundary_641xml';
+                String metaJson = '{"Title":"SBA641_XML_Report_' + varQuarterYear + '",' +
+                    '"PathOnClient":"SBA641_Report_' + varQuarterYear + '.xml",' +
+                    '"IsMajorVersion":true}';
+
+                // Build multipart body
+                Blob metaPart  = Blob.valueOf(
+                    '--' + boundary + '\r\n' +
+                    'Content-Disposition: form-data; name="entity_content"\r\n' +
+                    'Content-Type: application/json\r\n\r\n' +
+                    metaJson + '\r\n' +
+                    '--' + boundary + '\r\n' +
+                    'Content-Disposition: form-data; name="VersionData"; filename="SBA641_Report_' + varQuarterYear + '.xml"\r\n' +
+                    'Content-Type: text/xml\r\n\r\n'
+                );
+                Blob closePart = Blob.valueOf('\r\n--' + boundary + '--');
+
+                // Combine: metaPart + chunkData + closePart
+                Blob body = combine(combine(metaPart, chunkData), closePart);
+
+                HttpRequest req = new HttpRequest();
+                req.setEndpoint(baseUrl + '/services/data/v63.0/sobjects/ContentVersion');
+                req.setMethod('POST');
+                req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionId());
+                req.setHeader('Content-Type', 'multipart/form-data; boundary=' + boundary);
+                req.setBodyAsBlob(body);
+
+                HttpResponse res = new Http().send(req);
+                if (res.getStatusCode() == 201) {
+                    Map<String,Object> result = (Map<String,Object>)JSON.deserializeUntyped(res.getBody());
+                    targetCVId = (Id)result.get('id');
+                    // Get ContentDocumentId
+                    targetDocId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :targetCVId LIMIT 1].ContentDocumentId;
+                    bytesUploaded += chunkSize;
+                } else {
+                    sendEmail('SBA641 XML Assembly Error',
+                        'Failed to create ContentVersion. Status: ' + res.getStatusCode() +
+                        '\n' + res.getBody());
+                    return;
+                }
+            } else {
+                // Subsequent chunks — PATCH with Content-Range
+                String contentRange = 'bytes ' + bytesUploaded + '-' + rangeEnd + '/' + totalBytes;
+
+                String boundary = 'boundary_641xml';
+                String metaJson = '{"Id":"' + targetCVId + '"}';
+
+                Blob metaPart  = Blob.valueOf(
+                    '--' + boundary + '\r\n' +
+                    'Content-Disposition: form-data; name="entity_content"\r\n' +
+                    'Content-Type: application/json\r\n\r\n' +
+                    metaJson + '\r\n' +
+                    '--' + boundary + '\r\n' +
+                    'Content-Disposition: form-data; name="VersionData"; filename="SBA641_Report_' + varQuarterYear + '.xml"\r\n' +
+                    'Content-Type: text/xml\r\n' +
+                    'Content-Range: ' + contentRange + '\r\n\r\n'
+                );
+                Blob closePart = Blob.valueOf('\r\n--' + boundary + '--');
+                Blob body = combine(combine(metaPart, chunkData), closePart);
+
+                HttpRequest req = new HttpRequest();
+                req.setEndpoint(baseUrl + '/services/data/v63.0/sobjects/ContentVersion/' + targetCVId);
+                req.setMethod('PATCH');
+                req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionId());
+                req.setHeader('Content-Type', 'multipart/form-data; boundary=' + boundary);
+                req.setBodyAsBlob(body);
+
+                HttpResponse res = new Http().send(req);
+                if (res.getStatusCode() == 200 || res.getStatusCode() == 204) {
+                    bytesUploaded += chunkSize;
+                } else {
+                    sendEmail('SBA641 XML Assembly Error',
+                        'PATCH chunk ' + currentIndex + ' failed. Status: ' + res.getStatusCode() +
+                        '\n' + res.getBody());
+                    return;
+                }
+            }
+
+            Integer nextIndex = currentIndex + 1;
+            Boolean isDone    = (nextIndex >= chunkCVIds.size());
+
+            if (isDone) {
+                finalizeUpload();
+                cleanupChunks();
+            } else {
+                // Chain to next chunk
+                System.enqueueJob(new SBA641_XMLAssembler(
+                    chunkCVIds, nextIndex, varQuarterYear, ownerEmail,
+                    targetCVId, targetDocId, bytesUploaded, totalBytes
+                ));
+            }
+
+        } catch(Exception e) {
+            sendEmail('SBA641 XML Assembly Exception',
+                'Unexpected error at chunk ' + currentIndex + ': ' + e.getMessage() +
+                '\nStack: ' + e.getStackTraceString());
         }
     }
 
-    private void finalizeXml(Blob xmlBlob) {
-        // Create the SBA641_XML_Upload__c record
+    // ── Calculate total bytes across all chunks ────────────────────────────────
+    private Long calculateTotalSize() {
+        Long total = 0;
+        // Query in batches to avoid heap issues
+        for (ContentVersion cv : [SELECT VersionData FROM ContentVersion
+                                   WHERE Id IN :chunkCVIds]) {
+            total += cv.VersionData.size();
+        }
+        return total;
+    }
+
+    // ── Combine two Blobs ──────────────────────────────────────────────────────
+    private static Blob combine(Blob a, Blob b) {
+        return EncodingUtil.base64Decode(
+            EncodingUtil.base64Encode(a) + EncodingUtil.base64Encode(b)
+        );
+    }
+
+    // ── Finalize: link file + email ────────────────────────────────────────────
+    private void finalizeUpload() {
+        // Create SBA641_XML_Upload__c record
         SBA641_XML_Upload__c rec = new SBA641_XML_Upload__c();
         rec.QuarterYear__c = varQuarterYear;
         insert rec;
 
-        // Create final ContentVersion
-        ContentVersion cv = new ContentVersion();
-        cv.Title          = 'SBA641_XML_Report_' + varQuarterYear;
-        cv.PathOnClient   = 'SBA641_Report_' + varQuarterYear + '.xml';
-        cv.VersionData    = xmlBlob;
-        cv.IsMajorVersion = true;
-        insert cv;
+        // Link ContentDocument to upload record
+        if (targetDocId != null) {
+            ContentDocumentLink cdl = new ContentDocumentLink();
+            cdl.ContentDocumentId = targetDocId;
+            cdl.LinkedEntityId    = rec.Id;
+            cdl.ShareType         = 'V';
+            insert cdl;
+        }
 
-        // Link to upload record
-        Id docId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1].ContentDocumentId;
-        ContentDocumentLink cdl = new ContentDocumentLink();
-        cdl.ContentDocumentId = docId;
-        cdl.LinkedEntityId    = rec.Id;
-        cdl.ShareType         = 'V';
-        insert cdl;
+        // Email notification (no attachment — file is in Salesforce Files)
+        sendEmail(
+            'SBA641 XML Report \u2014 ' + varQuarterYear,
+            '641 XML report for ' + varQuarterYear + ' has been generated.\n\n' +
+            'The file is available in Salesforce Files linked to the ' +
+            'SBA 641 XML Upload record for ' + varQuarterYear + '.\n\n' +
+            'File: SBA641_Report_' + varQuarterYear + '.xml'
+        );
+    }
 
-        // Email with attachment
-        if (String.isNotBlank(ownerEmail)) {
-            Messaging.SingleEmailMessage m = new Messaging.SingleEmailMessage();
-            m.setToAddresses(new String[]{ ownerEmail });
-            m.setSubject('SBA641 XML Report \u2014 ' + varQuarterYear);
-            m.setPlainTextBody(
-                '641 XML report for ' + varQuarterYear + ' has been generated.\n\n' +
-                'The file is attached and also available in Salesforce Files linked to the ' +
-                'SBA 641 XML Upload record for ' + varQuarterYear + '.\n\n' +
-                'File: SBA641_Report_' + varQuarterYear + '.xml'
-            );
-            Messaging.EmailFileAttachment a = new Messaging.EmailFileAttachment();
-            a.setFileName('SBA641_Report_' + varQuarterYear + '.xml');
-            a.setBody(xmlBlob);
-            a.setContentType('text/xml');
-            m.setFileAttachments(new Messaging.EmailFileAttachment[]{ a });
-            try { Messaging.sendEmail(new Messaging.SingleEmailMessage[]{ m }); }
-            catch(Exception e) { System.debug('Email failed: ' + e.getMessage()); }
+    // ── Clean up temp chunk ContentVersions ───────────────────────────────────
+    private void cleanupChunks() {
+        try {
+            List<ContentDocument> docs = [SELECT Id FROM ContentDocument
+                WHERE Id IN (SELECT ContentDocumentId FROM ContentVersion
+                             WHERE Id IN :chunkCVIds)];
+            if (!docs.isEmpty()) delete docs;
+        } catch(Exception e) {
+            System.debug('Chunk cleanup failed: ' + e.getMessage());
         }
     }
 
-    private void writePartialFile(Blob data, Integer fromChunk) {
-        ContentVersion cv = new ContentVersion();
-        cv.Title          = 'SBA641_XML_PARTIAL_' + varQuarterYear + '_chunk' + fromChunk;
-        cv.PathOnClient   = cv.Title + '.xml';
-        cv.VersionData    = data;
-        cv.IsMajorVersion = false;
-        insert cv;
-    }
-
-    private void sendPartialNotification() {
-        if (String.isNotBlank(ownerEmail)) {
+    // ── Email helper ──────────────────────────────────────────────────────────
+    private void sendEmail(String subject, String body) {
+        if (String.isBlank(ownerEmail)) return;
+        try {
             Messaging.SingleEmailMessage m = new Messaging.SingleEmailMessage();
             m.setToAddresses(new String[]{ ownerEmail });
-            m.setSubject('SBA641 XML Report \u2014 ' + varQuarterYear + ' (Partial — File Too Large)');
-            m.setPlainTextBody(
-                'The 641 XML for ' + varQuarterYear + ' exceeded the Apex heap limit during assembly.\n\n' +
-                'Partial files have been saved to Salesforce Files. Please check Files for ' +
-                '"SBA641_XML_PARTIAL_' + varQuarterYear + '" files and concatenate them manually.\n\n' +
-                'Recommendation: Contact your Salesforce admin to adjust batch size for large quarters.'
-            );
-            try { Messaging.sendEmail(new Messaging.SingleEmailMessage[]{ m }); }
-            catch(Exception e) { System.debug('Notification email failed: ' + e.getMessage()); }
+            m.setSubject(subject);
+            m.setPlainTextBody(body);
+            Messaging.sendEmail(new Messaging.SingleEmailMessage[]{ m });
+        } catch(Exception e) {
+            System.debug('Email failed: ' + e.getMessage());
         }
     }
 }
