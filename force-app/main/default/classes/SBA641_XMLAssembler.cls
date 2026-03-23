@@ -1,16 +1,12 @@
 /**
  * SBA641_XMLAssembler
- * Assembles XML chunk ContentVersions into a final file.
+ * Writes XML chunks as part files in Salesforce Files.
+ * Each part is linked to SBA641_XML_Upload__c.
+ * The LWC downloads and merges parts client-side in the browser.
  *
- * Uses a simple Queueable chain that reads chunks in small groups,
- * writes partial files, then uses a final pass to concatenate.
- *
- * For very large quarters, writes the final XML directly using
- * the standard ContentVersion insert — reading chunks in order
- * and building the string only up to the heap-safe limit per execution.
- *
- * If the total XML exceeds ~6MB (Apex heap safe limit for string ops),
- * the file is split into numbered parts and the user is notified.
+ * Part file naming: SBA641_XML_Report_Q3_2025_Part001.xml etc.
+ * The LWC reads all parts via SOQL, downloads via ContentVersion body,
+ * and concatenates them using the browser's Blob API — zero Apex heap.
  */
 public class SBA641_XMLAssembler implements Queueable {
 
@@ -19,36 +15,44 @@ public class SBA641_XMLAssembler implements Queueable {
     private String   ownerEmail;
     private Integer  currentIndex;
     private Integer  partNumber;
+    private Id       uploadRecordId;
     private String   accumulated;
 
-    private static final Integer HEAP_SAFE_CHARS = 3000000; // ~3MB safe threshold (conservative for 20k records)
-    private static final Integer CHUNKS_PER_RUN  = 1;       // 1 chunk per execution — minimizes heap for large quarters
+    private static final Integer CHUNKS_PER_PART = 15;  // ~15 chunks × ~75KB = ~1MB per part
+    private static final Integer MAX_PARTS       = 50;  // safety limit
 
-    // Initial constructor
     public SBA641_XMLAssembler(List<Id> chunkCVIds, String varQuarterYear, String ownerEmail) {
-        this.chunkCVIds    = chunkCVIds;
+        this.chunkCVIds     = chunkCVIds;
         this.varQuarterYear = varQuarterYear;
-        this.ownerEmail    = ownerEmail;
-        this.currentIndex  = 0;
-        this.partNumber    = 1;
-        this.accumulated   = '';
+        this.ownerEmail     = ownerEmail;
+        this.currentIndex   = 0;
+        this.partNumber     = 1;
+        this.accumulated    = '';
     }
 
-    // Chaining constructor
     private SBA641_XMLAssembler(List<Id> chunkCVIds, String varQuarterYear, String ownerEmail,
-            Integer currentIndex, Integer partNumber, String accumulated) {
-        this.chunkCVIds    = chunkCVIds;
+            Integer currentIndex, Integer partNumber, Id uploadRecordId, String accumulated) {
+        this.chunkCVIds     = chunkCVIds;
         this.varQuarterYear = varQuarterYear;
-        this.ownerEmail    = ownerEmail;
-        this.currentIndex  = currentIndex;
-        this.partNumber    = partNumber;
-        this.accumulated   = accumulated;
+        this.ownerEmail     = ownerEmail;
+        this.currentIndex   = currentIndex;
+        this.partNumber     = partNumber;
+        this.uploadRecordId = uploadRecordId;
+        this.accumulated    = accumulated;
     }
 
     public void execute(QueueableContext ctx) {
         try {
+            // Create upload record on first execution
+            if (uploadRecordId == null) {
+                SBA641_XML_Upload__c rec = new SBA641_XML_Upload__c();
+                rec.QuarterYear__c = varQuarterYear;
+                insert rec;
+                uploadRecordId = rec.Id;
+            }
+
             // Read next batch of chunks
-            Integer endIdx = Math.min(currentIndex + CHUNKS_PER_RUN, chunkCVIds.size());
+            Integer endIdx = Math.min(currentIndex + CHUNKS_PER_PART, chunkCVIds.size());
             List<Id> batchIds = new List<Id>();
             for (Integer i = currentIndex; i < endIdx; i++) {
                 batchIds.add(chunkCVIds[i]);
@@ -64,119 +68,68 @@ public class SBA641_XMLAssembler implements Queueable {
                 accumulated += cv.VersionData.toString();
             }
 
-            Integer nextIndex = endIdx;
-            Boolean allChunksDone = (nextIndex >= chunkCVIds.size());
+            Integer nextIndex  = endIdx;
+            Boolean allDone    = (nextIndex >= chunkCVIds.size());
 
-            // Check if we need to flush to a part file
-            if (accumulated.length() >= HEAP_SAFE_CHARS && !allChunksDone) {
-                // Write this part and continue
-                writePartFile(accumulated, partNumber);
-                System.enqueueJob(new SBA641_XMLAssembler(
-                    chunkCVIds, varQuarterYear, ownerEmail,
-                    nextIndex, partNumber + 1, ''
-                ));
-                return;
-            }
+            // Add closing tag on last part
+            if (allDone) accumulated += '</CounselingInformation>\n';
 
-            if (allChunksDone) {
-                // Add closing tag
-                accumulated += '</CounselingInformation>\n';
+            // Write this part as a ContentVersion
+            writePart(accumulated, partNumber, uploadRecordId);
 
-                if (partNumber == 1) {
-                    // Single part — write final file directly
-                    writeFinalFile(accumulated);
-                    cleanupChunks();
-                    notifySuccess(1);
+            if (allDone) {
+                cleanupChunks();
+                Integer totalParts = partNumber;
+                if (totalParts == 1) {
+                    // Single part — rename as final file
+                    sendEmail('SBA641 XML Report \u2014 ' + varQuarterYear,
+                        '641 XML for ' + varQuarterYear + ' is ready.\n\n' +
+                        'Open the SBA 641 XML Upload record for ' + varQuarterYear +
+                        ' in Salesforce to download the file.');
                 } else {
-                    // Multiple parts — write last part and notify
-                    writePartFile(accumulated, partNumber);
-                    cleanupChunks();
-                    notifyMultipart(partNumber);
+                    sendEmail('SBA641 XML Report \u2014 ' + varQuarterYear + ' (Ready to Download)',
+                        '641 XML for ' + varQuarterYear + ' is ready (' + totalParts + ' parts).\n\n' +
+                        'Return to the SBA 641 Counseling Report wizard and click ' +
+                        '"Download & Merge XML" to automatically combine the parts ' +
+                        'and download the final file to your computer.');
                 }
-            } else {
-                // More chunks to process
+            } else if (partNumber < MAX_PARTS) {
                 System.enqueueJob(new SBA641_XMLAssembler(
                     chunkCVIds, varQuarterYear, ownerEmail,
-                    nextIndex, partNumber, accumulated
+                    nextIndex, partNumber + 1, uploadRecordId, ''
                 ));
             }
 
         } catch (Exception e) {
-            sendEmail(
-                'SBA641 XML Assembly Error — ' + varQuarterYear,
-                'Assembly failed at chunk ' + currentIndex + ':\n' +
-                e.getMessage() + '\n\n' + e.getStackTraceString()
-            );
+            sendEmail('SBA641 XML Assembly Error \u2014 ' + varQuarterYear,
+                'Error at chunk ' + currentIndex + ':\n' + e.getMessage() +
+                '\nStack: ' + e.getStackTraceString());
         }
     }
 
-    private void writeFinalFile(String xml) {
-        SBA641_XML_Upload__c rec = new SBA641_XML_Upload__c();
-        rec.QuarterYear__c = varQuarterYear;
-        insert rec;
-
+    private void writePart(String xml, Integer partNum, Id recId) {
+        String label = String.valueOf(partNum).leftPad(3, '0');
         ContentVersion cv = new ContentVersion();
-        cv.Title          = 'SBA641_XML_Report_' + varQuarterYear;
-        cv.PathOnClient   = 'SBA641_Report_' + varQuarterYear + '.xml';
+        cv.Title          = 'SBA641_XML_Report_' + varQuarterYear + '_Part' + label;
+        cv.PathOnClient   = cv.Title + '.xml';
         cv.VersionData    = Blob.valueOf(xml);
-        cv.IsMajorVersion = true;
+        cv.IsMajorVersion = false;
         insert cv;
 
         Id docId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1].ContentDocumentId;
         ContentDocumentLink cdl = new ContentDocumentLink();
         cdl.ContentDocumentId = docId;
-        cdl.LinkedEntityId    = rec.Id;
+        cdl.LinkedEntityId    = recId;
         cdl.ShareType         = 'V';
         insert cdl;
     }
 
-    private void writePartFile(String xml, Integer partNum) {
-        String partLabel = String.valueOf(partNum).leftPad(2, '0');
-        ContentVersion cv = new ContentVersion();
-        cv.Title          = 'SBA641_XML_Report_' + varQuarterYear + '_Part' + partLabel;
-        cv.PathOnClient   = cv.Title + '.xml';
-        cv.VersionData    = Blob.valueOf(xml);
-        cv.IsMajorVersion = false;
-        insert cv;
-    }
-
     private void cleanupChunks() {
         try {
-            List<ContentDocument> docs = [
-                SELECT Id FROM ContentDocument
-                WHERE Id IN (
-                    SELECT ContentDocumentId FROM ContentVersion WHERE Id IN :chunkCVIds
-                )
-            ];
+            List<ContentDocument> docs = [SELECT Id FROM ContentDocument
+                WHERE Id IN (SELECT ContentDocumentId FROM ContentVersion WHERE Id IN :chunkCVIds)];
             if (!docs.isEmpty()) delete docs;
-        } catch (Exception e) {
-            System.debug('Chunk cleanup error: ' + e.getMessage());
-        }
-    }
-
-    private void notifySuccess(Integer parts) {
-        sendEmail(
-            'SBA641 XML Report \u2014 ' + varQuarterYear,
-            '641 XML report for ' + varQuarterYear + ' has been generated successfully.\n\n' +
-            'The file is available in Salesforce Files linked to the ' +
-            'SBA 641 XML Upload record for ' + varQuarterYear + '.\n\n' +
-            'File: SBA641_Report_' + varQuarterYear + '.xml'
-        );
-    }
-
-    private void notifyMultipart(Integer parts) {
-        String partList = '';
-        for (Integer i = 1; i <= parts; i++) {
-            partList += '  SBA641_XML_Report_' + varQuarterYear + '_Part' + String.valueOf(i).leftPad(2, '0') + '.xml\n';
-        }
-        sendEmail(
-            'SBA641 XML Report \u2014 ' + varQuarterYear + ' (' + parts + ' parts)',
-            '641 XML for ' + varQuarterYear + ' was too large for a single file and has been split into ' + parts + ' parts.\n\n' +
-            'Files saved to Salesforce Files:\n' + partList + '\n' +
-            'To create the final submission file, concatenate these files in order:\n' +
-            '  Windows: copy /b Part01.xml + Part02.xml SBA641_Report_' + varQuarterYear + '.xml\n' +
-            '  Mac/Linux: cat Part01.xml Part02.xml > SBA641_Report_' + varQuarterYear + '.xml'
-        );
+        } catch (Exception e) { System.debug('Cleanup error: ' + e.getMessage()); }
     }
 
     private void sendEmail(String subject, String body) {
@@ -187,8 +140,6 @@ public class SBA641_XMLAssembler implements Queueable {
             m.setSubject(subject);
             m.setPlainTextBody(body);
             Messaging.sendEmail(new Messaging.SingleEmailMessage[]{ m });
-        } catch (Exception e) {
-            System.debug('Email error: ' + e.getMessage());
-        }
+        } catch (Exception e) { System.debug('Email error: ' + e.getMessage()); }
     }
 }

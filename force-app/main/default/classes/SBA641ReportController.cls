@@ -257,3 +257,41 @@ public with sharing class SBA641ReportController {
         }
     }
 }
+
+    // ── Get part file ContentVersions for client-side merge ───────────────────
+    // Returns ordered list of {cvId, title} for all parts linked to the
+    // most recent SBA641_XML_Upload__c for this quarter.
+    @AuraEnabled(cacheable=false)
+    public static List<Map<String,String>> getXmlPartFiles(String quarterYear) {
+        List<Map<String,String>> result = new List<Map<String,String>>();
+
+        // Find the most recent upload record for this quarter
+        List<SBA641_XML_Upload__c> uploads = [
+            SELECT Id FROM SBA641_XML_Upload__c
+            WHERE QuarterYear__c = :quarterYear
+            ORDER BY CreatedDate DESC LIMIT 1
+        ];
+        if (uploads.isEmpty()) return result;
+
+        Id uploadId = uploads[0].Id;
+
+        // Get all linked ContentVersions that are part files, ordered by title
+        for (ContentVersion cv : [
+            SELECT Id, Title, ContentDocumentId
+            FROM ContentVersion
+            WHERE ContentDocumentId IN (
+                SELECT ContentDocumentId FROM ContentDocumentLink
+                WHERE LinkedEntityId = :uploadId
+            )
+            AND Title LIKE :('SBA641_XML_Report_' + quarterYear + '%')
+            AND IsLatest = true
+            ORDER BY Title ASC
+        ]) {
+            result.add(new Map<String,String>{
+                'cvId'  => cv.Id,
+                'title' => cv.Title
+            });
+        }
+        return result;
+    }
+}

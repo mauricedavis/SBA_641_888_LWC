@@ -6,6 +6,7 @@ import extractSessions   from '@salesforce/apex/SBA641ReportController.extractSe
 import getOutputCount    from '@salesforce/apex/SBA641ReportController.getOutputCount';
 import validateQuarter   from '@salesforce/apex/SBA641ReportController.validateQuarter';
 import generateXml       from '@salesforce/apex/SBA641ReportController.generateXml';
+import getXmlPartFiles   from '@salesforce/apex/SBA641ReportController.getXmlPartFiles';
 import saveRunState      from '@salesforce/apex/SBA641ReportController.saveRunState';
 import loadRunState      from '@salesforce/apex/SBA641ReportController.loadRunState';
 import clearRunState     from '@salesforce/apex/SBA641ReportController.clearRunState';
@@ -27,6 +28,7 @@ export default class Sba641ReportingWizard extends LightningElement {
     @track selectedYear        = String(new Date().getFullYear());
     @track dateLabel           = '';
     @track existingRecordCount = 0;
+    @track existingPartCount   = 0;
 
     // Step 2 — Extract
     @track isExtracting        = false;
@@ -125,10 +127,26 @@ export default class Sba641ReportingWizard extends LightningElement {
             // Check for existing output records
             const cnt = await getOutputCount({ quarterYear: this.quarterYear });
             this.existingRecordCount = cnt || 0;
+            // Check for existing XML part files — show download button if found
+            const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
+            if (parts && parts.length > 0) {
+                this.existingPartCount = parts.length;
+            } else {
+                this.existingPartCount = 0;
+            }
         } catch(e) {
             this.dateLabel = '';
             this.existingRecordCount = 0;
+            this.existingPartCount = 0;
         }
+    }
+
+    // Re-generate XML — jump to Step 4 using existing extracted records
+    async handleReGenerate() {
+        this.extractedCount    = this.existingRecordCount;
+        this.existingPartCount = 0;
+        this.currentStep       = 4;
+        await this._save('In Progress');
     }
 
     // Skip extraction — jump straight to validate using existing records
@@ -233,14 +251,68 @@ export default class Sba641ReportingWizard extends LightningElement {
     async handleJobComplete(e) {
         const { status } = e.detail;
         await this._save(status === 'Completed' ? 'Complete' : 'Failed');
-        this.dispatchEvent(new ShowToastEvent({
-            title:   status === 'Completed' ? '\u2705 XML Generated' : 'Generation Failed',
-            message: status === 'Completed'
-                ? `641 XML for ${this.quarterYear} generated and emailed.`
-                : `Batch ended with status: ${status}`,
-            variant: status === 'Completed' ? 'success' : 'error',
-            mode: 'sticky'
-        }));
+        if (status === 'Completed') {
+            this.xmlComplete        = true;
+            this.showDownloadButton = true;
+        } else {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Generation Failed',
+                message: `Batch ended with status: ${status}`,
+                variant: 'error', mode: 'sticky'
+            }));
+        }
+    }
+
+    async handleDownloadAndMerge() {
+        this.isMerging   = true;
+        this.mergeStatus = 'Looking up part files…';
+        try {
+            const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
+            if (!parts || parts.length === 0) {
+                this.mergeStatus = 'No part files found. Check your email for the file.';
+                this.isMerging   = false;
+                return;
+            }
+            if (parts.length === 1) {
+                // Single file — download directly
+                this.mergeStatus = 'Downloading file…';
+                const url = `/sfc/servlet.shepherd/version/download/${parts[0].cvId}`;
+                window.open(url, '_blank');
+                this.isMerging   = false;
+                this.mergeStatus = 'Download started.';
+                return;
+            }
+            // Multiple parts — fetch each and concatenate as text
+            this.mergeStatus = `Downloading ${parts.length} parts…`;
+            const textParts = [];
+            for (let i = 0; i < parts.length; i++) {
+                this.mergeStatus = `Downloading part ${i + 1} of ${parts.length}…`;
+                const url = `/sfc/servlet.shepherd/version/download/${parts[i].cvId}`;
+                const response = await fetch(url, { credentials: 'same-origin' });
+                if (!response.ok) throw new Error(`Failed to download part ${i + 1}: ${response.status}`);
+                const text = await response.text();
+                textParts.push(text);
+            }
+            this.mergeStatus = 'Merging parts and triggering download…';
+            const merged  = textParts.join('');
+            const blob    = new Blob([merged], { type: 'text/xml' });
+            const blobUrl = URL.createObjectURL(blob);
+            const a       = document.createElement('a');
+            a.href        = blobUrl;
+            a.download    = `SBA641_Report_${this.quarterYear}.xml`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+            this.isMerging      = false;
+            this.mergeComplete  = true;
+            this.mergeStatus    = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
+            this.showDownloadButton  = false;
+            this.existingPartCount   = 0;
+        } catch(err) {
+            this.isMerging   = false;
+            this.mergeStatus = 'Error: ' + (err.message || err);
+        }
     }
 
     async handleBack() {
@@ -256,6 +328,9 @@ export default class Sba641ReportingWizard extends LightningElement {
         this.selectedQuarter     = '';
         this.dateLabel           = '';
         this.existingRecordCount = 0;
+        this.existingPartCount   = 0;
+        this.mergeComplete       = false;
+        this.mergeStatus         = '';
         this.extractJobId        = null;
         this.extractedCount      = 0;
         this.xmlJobId            = null;

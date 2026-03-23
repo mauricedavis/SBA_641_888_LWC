@@ -9,6 +9,20 @@
                 warning-count={warningCount}>
             </c-nexus-report-validation-panel>
 
+            <!-- Global merge status — shown whenever download is in progress -->
+            <template if:true={isMerging}>
+                <div class="slds-notify slds-notify_alert slds-theme_info slds-m-bottom_small" role="status">
+                    <lightning-spinner alternative-text="Merging..." size="x-small" class="slds-m-right_x-small"></lightning-spinner>
+                    {mergeStatus}
+                </div>
+            </template>
+            <template if:true={mergeComplete}>
+                <div class="slds-notify slds-notify_alert slds-theme_success slds-m-bottom_small" role="status">
+                    <lightning-icon icon-name="utility:success" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                    {mergeStatus}
+                </div>
+            </template>
+
             <lightning-progress-indicator current-step={currentStepStr} type="path">
                 <lightning-progress-step label="Select Quarter"   value="1"></lightning-progress-step>
                 <lightning-progress-step label="Extract Sessions" value="2"></lightning-progress-step>
@@ -54,6 +68,23 @@
                                 </lightning-button>
                                 <lightning-button label="Re-Extract (replaces existing)" variant="neutral"
                                     onclick={handleExtract}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- XML parts already exist — show download button -->
+                    <template if:true={existingPartCount}>
+                        <div class="slds-notify slds-notify_alert slds-theme_success slds-m-top_small" role="alert">
+                            <lightning-icon icon-name="utility:file" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                            XML report already generated for <strong>{quarterYear}</strong> ({existingPartCount} part file(s) ready).
+                            <div class="slds-m-top_x-small">
+                                <lightning-button label="&#x2B07; Download &amp; Merge XML" variant="brand"
+                                    icon-name="utility:download" onclick={handleDownloadAndMerge}
+                                    class="slds-m-right_x-small">
+                                </lightning-button>
+                                <lightning-button label="Re-Generate XML" variant="neutral"
+                                    onclick={handleReGenerate}>
                                 </lightning-button>
                             </div>
                         </div>
@@ -165,11 +196,36 @@
 
                 <!-- Step 5: Generate XML -->
                 <template if:true={isStep5}>
-                    <p class="slds-m-bottom_small">Generating 641 XML for <strong>{quarterYear}</strong>&#x2026;</p>
-                    <c-nexus-report-progress-tracker
-                        job-id={xmlJobId}
-                        onjobcomplete={handleJobComplete}>
-                    </c-nexus-report-progress-tracker>
+                    <template if:false={xmlComplete}>
+                        <p class="slds-m-bottom_small">Generating 641 XML for <strong>{quarterYear}</strong>&#x2026;</p>
+                        <c-nexus-report-progress-tracker
+                            job-id={xmlJobId}
+                            onjobcomplete={handleJobComplete}>
+                        </c-nexus-report-progress-tracker>
+                    </template>
+                    <template if:true={xmlComplete}>
+                        <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                            <p class="slds-text-heading_small">
+                                <lightning-icon icon-name="utility:success" size="small" variant="success" class="slds-m-right_x-small"></lightning-icon>
+                                XML generation complete for <strong>{quarterYear}</strong>
+                            </p>
+                            <p class="slds-text-color_weak slds-text-body_small slds-m-top_x-small">
+                                The XML file is being assembled. You will receive an email when ready.
+                                If the file was split into multiple parts, click below to merge and download.
+                            </p>
+                        </div>
+                        <lightning-button
+                            label="&#x2B07; Download &amp; Merge XML"
+                            variant="brand"
+                            icon-name="utility:download"
+                            onclick={handleDownloadAndMerge}
+                            if:true={showDownloadButton}>
+                        </lightning-button>
+                        <template if:true={isMerging}>
+                            <lightning-spinner alternative-text="Merging parts..." size="small"></lightning-spinner>
+                            <span class="slds-m-left_small slds-text-color_weak">{mergeStatus}</span>
+                        </template>
+                    </template>
                 </template>
 
             </div>
