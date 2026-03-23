@@ -88,7 +88,8 @@ public with sharing class SBA641ReportController {
                    LastClientNamePart1__c, FirstClientNamePart1__c,
                    RaceClientIntake__c, EthnicityClientIntake__c, SexClientIntake__c,
                    MilitaryStatusClientIntake__c, SessionType_CounselorRecord__c,
-                   PrimaryPhonePart1__c, Primary_PhonePart3__c,
+                   PrimaryPhonePart1__c, SecondaryPhonePart1__c,
+                   Primary_PhonePart3__c, Secondary_PhonePart3__c,
                    CountryAddressPart1__c, Country_AddressPart3__c,
                    DateCounseled_CounselorRecord__c, PartnerSessionNumber_Counselor__c
             FROM SBA_641_Output__c
@@ -119,7 +120,7 @@ public with sharing class SBA641ReportController {
     @AuraEnabled
     public static String generateXml(String quarterYear, String reportType) {
         return String.valueOf(
-            Database.executeBatch(new SBA641_XMLBatch_REFACTORED(quarterYear, reportType), 200)
+            Database.executeBatch(new SBA641_XMLBatch_REFACTORED(quarterYear, reportType), 50)
         );
     }
 
