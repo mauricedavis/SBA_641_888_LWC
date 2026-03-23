@@ -297,58 +297,22 @@ public with sharing class SBA641_XMLBatch_REFACTORED
 
     // ── FIXED: close root here only ───────────────────────────────────────────
     public void finish(Database.BatchableContext bc) {
-        // Assemble full XML from ordered chunks + closing tag
-        String fullXml = '';
+        // Enqueue a Queueable to assemble chunks — avoids heap limit in finish()
+        // The assembler streams chunks via Files REST API without holding full XML in memory
         if (!chunkCVIds.isEmpty()) {
-            List<ContentVersion> chunks = [
-                SELECT Title, VersionData FROM ContentVersion
-                WHERE Id IN :chunkCVIds
-                ORDER BY Title ASC
-            ];
-            List<String> parts = new List<String>();
-            for (ContentVersion cv : chunks) {
-                parts.add(cv.VersionData.toString());
-            }
-            parts.add('</CounselingInformation>\n');
-            fullXml = String.join(parts, '');
-            // Clean up temp chunks
-            List<ContentDocument> docs = [SELECT Id FROM ContentDocument
-                WHERE Id IN (SELECT ContentDocumentId FROM ContentVersion WHERE Id IN :chunkCVIds)];
-            if (!docs.isEmpty()) delete docs;
-        }
+            // Add closing tag as final chunk
+            ContentVersion cvClose = new ContentVersion();
+            cvClose.Title          = 'SBA641_XML_Chunk_' + varQuarterYear + '_999_CLOSE';
+            cvClose.PathOnClient   = cvClose.Title + '.txt';
+            cvClose.VersionData    = Blob.valueOf('</CounselingInformation>\n');
+            cvClose.IsMajorVersion = false;
+            insert cvClose;
+            chunkCVIds.add(cvClose.Id);
 
-        SBA641_XML_Upload__c rec = new SBA641_XML_Upload__c();
-        rec.QuarterYear__c = varQuarterYear;
-        insert rec;
-
-        Blob xmlBlob = Blob.valueOf(fullXml);
-        try {
-            ContentVersion cv = new ContentVersion();
-            cv.Title = 'SBA641_XML_Report_' + varQuarterYear;
-            cv.PathOnClient = 'SBA641_Report_' + varQuarterYear + '.xml';
-            cv.VersionData = xmlBlob;
-            cv.IsMajorVersion = true;
-            insert cv;
-            ContentDocumentLink cdl = new ContentDocumentLink();
-            cdl.ContentDocumentId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id LIMIT 1].ContentDocumentId;
-            cdl.LinkedEntityId = rec.Id;
-            cdl.ShareType = 'V';
-            insert cdl;
-        } catch (Exception e) {
-            System.debug('SBA641_XMLBatch_REFACTORED finish error: ' + e.getMessage());
-        }
-
-        if (String.isNotBlank(ownerEmail)) {
-            Messaging.SingleEmailMessage m = new Messaging.SingleEmailMessage();
-            m.setToAddresses(new String[]{ ownerEmail });
-            m.setSubject('SBA641 XML Report — ' + varQuarterYear);
-            m.setPlainTextBody('641 XML for ' + varQuarterYear + ' is ready. See attachment.');
-            Messaging.EmailFileAttachment a = new Messaging.EmailFileAttachment();
-            a.setFileName('SBA641_Report_' + varQuarterYear + '.xml');
-            a.setBody(xmlBlob);
-            a.setContentType('text/xml');
-            m.setFileAttachments(new Messaging.EmailFileAttachment[]{ a });
-            Messaging.sendEmail(new Messaging.SingleEmailMessage[]{ m });
+            // Enqueue the assembler
+            System.enqueueJob(new SBA641_XMLAssembler(
+                chunkCVIds, varQuarterYear, ownerEmail
+            ));
         }
     }
 
