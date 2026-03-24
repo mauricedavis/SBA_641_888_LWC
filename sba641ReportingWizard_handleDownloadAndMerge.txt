@@ -1,0 +1,27 @@
+// 1. ADD this import at the top of sba641ReportingWizard.js (with other imports):
+import getUploadRecordId   from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
+
+// 2. REPLACE handleDownloadAndMerge() method with this:
+    async handleDownloadAndMerge() {
+        this.isMerging   = true;
+        this.mergeStatus = 'Looking up upload record\u2026';
+        try {
+            const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
+            if (!uploadId) {
+                this.mergeStatus = 'No upload record found for ' + this.quarterYear;
+                this.isMerging   = false;
+                return;
+            }
+            this.mergeStatus = 'Opening download\u2026';
+            const url = `/apex/SBA641_XMLDownload?uploadId=${uploadId}`;
+            window.open(url, '_blank');
+            this.isMerging     = false;
+            this.mergeComplete = true;
+            this.mergeStatus   = '\u2705 Download started! Check your browser for SBA641_Report_' + this.quarterYear + '.xml';
+            this.showDownloadButton = false;
+            this.existingPartCount  = 0;
+        } catch(err) {
+            this.isMerging   = false;
+            this.mergeStatus = 'Error: ' + (err.message || err);
+        }
+    }

@@ -1,3 +1,4 @@
+import getUploadRecordId   from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getQuarterDates   from '@salesforce/apex/SBA641ReportController.getQuarterDates';
@@ -276,52 +277,25 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
+    // 2. REPLACE handleDownloadAndMerge() method with this:
     async handleDownloadAndMerge() {
         this.isMerging   = true;
-        this.mergeStatus = 'Looking up part files…';
+        this.mergeStatus = 'Looking up upload record\u2026';
         try {
-            const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
-            if (!parts || parts.length === 0) {
-                this.mergeStatus = 'No part files found. Check your email for the file.';
+            const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
+            if (!uploadId) {
+                this.mergeStatus = 'No upload record found for ' + this.quarterYear;
                 this.isMerging   = false;
                 return;
             }
-            if (parts.length === 1) {
-                // Single file — download directly
-                this.mergeStatus = 'Downloading file…';
-                const url = `/sfc/servlet.shepherd/version/download/${parts[0].cvId}`;
-                window.open(url, '_blank');
-                this.isMerging   = false;
-                this.mergeStatus = 'Download started.';
-                return;
-            }
-            // Multiple parts — fetch each and concatenate as text
-            this.mergeStatus = `Downloading ${parts.length} parts…`;
-            const textParts = [];
-            for (let i = 0; i < parts.length; i++) {
-                this.mergeStatus = `Downloading part ${i + 1} of ${parts.length}…`;
-                const url = `/sfc/servlet.shepherd/version/download/${parts[i].cvId}`;
-                const response = await fetch(url, { credentials: 'same-origin' });
-                if (!response.ok) throw new Error(`Failed to download part ${i + 1}: ${response.status}`);
-                const text = await response.text();
-                textParts.push(text);
-            }
-            this.mergeStatus = 'Merging parts and triggering download…';
-            const merged  = textParts.join('');
-            const blob    = new Blob([merged], { type: 'text/xml' });
-            const blobUrl = URL.createObjectURL(blob);
-            const a       = document.createElement('a');
-            a.href        = blobUrl;
-            a.download    = `SBA641_Report_${this.quarterYear}.xml`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(blobUrl);
-            this.isMerging      = false;
-            this.mergeComplete  = true;
-            this.mergeStatus    = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
-            this.showDownloadButton  = false;
-            this.existingPartCount   = 0;
+            this.mergeStatus = 'Opening download\u2026';
+            const url = `/apex/SBA641_XMLDownload?uploadId=${uploadId}`;
+            window.open(url, '_blank');
+            this.isMerging     = false;
+            this.mergeComplete = true;
+            this.mergeStatus   = '\u2705 Download started! Check your browser for SBA641_Report_' + this.quarterYear + '.xml';
+            this.showDownloadButton = false;
+            this.existingPartCount  = 0;
         } catch(err) {
             this.isMerging   = false;
             this.mergeStatus = 'Error: ' + (err.message || err);

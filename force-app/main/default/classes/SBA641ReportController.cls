@@ -300,4 +300,13 @@ public with sharing class SBA641ReportController {
         }
         return result;
     }
+	@AuraEnabled(cacheable=false)
+	public static Id getUploadRecordId(String quarterYear) {
+    List<SBA641_XML_Upload__c> uploads = [
+        SELECT Id FROM SBA641_XML_Upload__c
+        WHERE QuarterYear__c = :quarterYear
+        ORDER BY CreatedDate DESC LIMIT 1
+    ];
+    return uploads.isEmpty() ? null : uploads[0].Id;
+	}
 }
