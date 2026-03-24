@@ -1,3 +1,5 @@
+// ADD this import at the top of sba641ReportingWizard.js:
+import getUploadRecordId from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getQuarterDates   from '@salesforce/apex/SBA641ReportController.getQuarterDates';
@@ -215,52 +217,27 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-    // ── Download & Merge ───────────────────────────────────────────────────────
-    // Uses VF base URL (vf.force.com) to avoid lightning.force.com redirect/CORS
+// REPLACE handleDownloadAndMerge() with this version:
+// Opens the VF merge page in a new tab — no CORS (full browser navigation)
+// VF page auto-downloads all parts and shows PowerShell merge command
+ 
     async handleDownloadAndMerge() {
-        this.isMerging = true; this.mergeComplete = false;
-        this.mergeStatus = 'Preparing download\u2026';
+        this.isMerging     = true;
+        this.mergeComplete = false;
+        this.mergeStatus   = 'Opening download page\u2026';
         try {
-            const [parts, vfBase] = await Promise.all([
-                getXmlPartFiles({ quarterYear: this.quarterYear }),
-                getVfBaseUrl()
-            ]);
-
-            if (!parts || parts.length === 0) {
-                this.mergeStatus = 'No part files found. Please re-generate XML.';
+            const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
+            if (!uploadId) {
+                this.mergeStatus = 'No upload record found. Please re-generate XML.';
                 this.isMerging   = false;
                 return;
             }
-
-            const textParts = [];
-            for (let i = 0; i < parts.length; i++) {
-                this.mergeStatus = 'Downloading part ' + (i + 1) + ' of ' + parts.length + '\u2026';
-                // Use vf.force.com base URL directly — avoids cross-origin redirect
-                const url  = vfBase + '/apex/SBA641_XMLDownload?cvId=' + parts[i].cvId;
-                const resp = await fetch(url, { credentials: 'include' });
-                if (!resp.ok) throw new Error('Part ' + (i + 1) + ' failed: HTTP ' + resp.status);
-                textParts.push(await resp.text());
-            }
-
-            this.mergeStatus = 'Creating merged file\u2026';
-            const blob    = new Blob(textParts, { type: 'application/xml' });
-            const blobUrl = URL.createObjectURL(blob);
-            const link    = document.createElement('a');
-            link.href     = blobUrl;
-            link.download = 'SBA641_Report_' + this.quarterYear + '.xml';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(blobUrl);
-
-            this.isMerging          = false;
-            this.mergeComplete      = true;
-            this.mergeStatus        = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
-            this.showDownloadButton = false;
-            this.existingPartCount  = 0;
-
+            // Open VF page in new tab — full browser navigation, no CORS
+            window.open('/apex/SBA641_XMLMerge?uploadId=' + uploadId, '_blank');
+            this.isMerging     = false;
+            this.mergeComplete = true;
+            this.mergeStatus   = '\u2705 Download page opened in new tab. Follow the instructions there.';
         } catch(err) {
-            console.error('Download error:', err);
             this.isMerging   = false;
             this.mergeStatus = 'Error: ' + (err.message || String(err));
         }

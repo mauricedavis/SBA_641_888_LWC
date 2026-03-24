@@ -1,0 +1,58 @@
+<apex:page controller="SBA641_XMLMergeController" action="{!init}" showHeader="false" sidebar="false" standardStylesheets="false">
+    <html>
+    <head>
+        <title>SBA641 XML Merge</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .status { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 4px; }
+            .done { background: #d4edda; color: #155724; }
+            .cmd { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; font-family: monospace; margin: 10px 0; white-space: pre-wrap; word-break: break-all; }
+            button { padding: 8px 16px; background: #0070d2; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        </style>
+    </head>
+    <body>
+        <h2>SBA 641 XML Report — {!quarterYear}</h2>
+        <apex:outputPanel id="status">
+            <apex:outputText value="{!statusMessage}" escape="false"/>
+        </apex:outputPanel>
+        <div id="downloadArea"></div>
+        <script>
+        var parts = {!partsJson};
+        var qy = '{!quarterYear}';
+        var downloaded = 0;
+
+        function downloadNext() {
+            if (downloaded >= parts.length) {
+                document.getElementById('downloadArea').innerHTML =
+                    '<div class="status done">' +
+                    '<strong>\u2705 ' + parts.length + ' files downloaded!</strong><br/>' +
+                    'Now run this PowerShell command to merge them:<br/>' +
+                    '<div class="cmd">cd ~\\Downloads\nGet-Content SBA641_XML_Report_' + qy + '_Part*.xml | Set-Content SBA641_Report_' + qy + '.xml</div>' +
+                    '<button onclick="copyCmd()">Copy Command</button>' +
+                    '</div>';
+                return;
+            }
+            var part = parts[downloaded];
+            var a = document.createElement('a');
+            a.href = '/sfc/servlet.shepherd/version/download/' + part.cvId;
+            a.download = part.title + '.xml';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            downloaded++;
+            document.getElementById('downloadArea').innerHTML =
+                '<div class="status">Downloading part ' + downloaded + ' of ' + parts.length + '\u2026</div>';
+            setTimeout(downloadNext, 800);
+        }
+
+        function copyCmd() {
+            var cmd = 'cd ~\\Downloads\nGet-Content SBA641_XML_Report_' + qy + '_Part*.xml | Set-Content SBA641_Report_' + qy + '.xml';
+            navigator.clipboard.writeText(cmd).then(function() { alert('Command copied!'); });
+        }
+
+        // Start downloading after page loads
+        setTimeout(downloadNext, 500);
+        </script>
+    </body>
+    </html>
+</apex:page>
