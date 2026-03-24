@@ -277,28 +277,51 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-    // 2. REPLACE handleDownloadAndMerge() method with this:
+// REPLACE handleDownloadAndMerge() in sba641ReportingWizard.js with this version:
+// This fetches each part via the VF page (same-origin = no CSP block) one at a time
+
     async handleDownloadAndMerge() {
         this.isMerging   = true;
-        this.mergeStatus = 'Looking up upload record\u2026';
+        this.mergeStatus = 'Looking up part files\u2026';
         try {
-            const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
-            if (!uploadId) {
-                this.mergeStatus = 'No upload record found for ' + this.quarterYear;
+            const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
+            if (!parts || parts.length === 0) {
+                this.mergeStatus = 'No part files found. Please re-generate the XML.';
                 this.isMerging   = false;
                 return;
             }
-            this.mergeStatus = 'Opening download\u2026';
-            const url = `/apex/SBA641_XMLDownload?uploadId=${uploadId}`;
-            window.open(url, '_blank');
-            this.isMerging     = false;
-            this.mergeComplete = true;
-            this.mergeStatus   = '\u2705 Download started! Check your browser for SBA641_Report_' + this.quarterYear + '.xml';
+
+            const textParts = [];
+            for (let i = 0; i < parts.length; i++) {
+                this.mergeStatus = `Downloading part ${i + 1} of ${parts.length}\u2026`;
+                // VF page is same-origin so fetch() is allowed by CSP
+                const url = `/apex/SBA641_XMLDownload?cvId=${parts[i].cvId}`;
+                const response = await fetch(url, { credentials: 'same-origin' });
+                if (!response.ok) throw new Error(`Part ${i + 1} download failed: ${response.status}`);
+                const text = await response.text();
+                textParts.push(text);
+            }
+
+            this.mergeStatus = 'Merging and downloading\u2026';
+            const merged  = textParts.join('');
+            const blob    = new Blob([merged], { type: 'text/xml' });
+            const blobUrl = URL.createObjectURL(blob);
+            const a       = document.createElement('a');
+            a.href        = blobUrl;
+            a.download    = `SBA641_Report_${this.quarterYear}.xml`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+
+            this.isMerging          = false;
+            this.mergeComplete      = true;
+            this.mergeStatus        = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
             this.showDownloadButton = false;
             this.existingPartCount  = 0;
         } catch(err) {
             this.isMerging   = false;
-            this.mergeStatus = 'Error: ' + (err.message || err);
+            this.mergeStatus = 'Error: ' + (err.message || String(err));
         }
     }
 

@@ -1,29 +1,32 @@
+/**
+ * SBA641_XMLDownloadController
+ * Serves ONE XML part file at a time to avoid heap limits.
+ * URL: /apex/SBA641_XMLDownload?cvId={ContentVersion.Id}
+ * The LWC fetches each part sequentially and merges them client-side.
+ *
+ * Note: This VF page is same-origin with the LWC, so fetch() from
+ * a VF page URL IS allowed (unlike direct ContentVersion URLs).
+ */
 public class SBA641_XMLDownloadController {
-    public String fileName   { get; private set; }
+
     public String xmlContent { get; private set; }
+
     public SBA641_XMLDownloadController() {
-        fileName = 'SBA641_Report.xml';
         xmlContent = '';
     }
+
     public PageReference streamXml() {
-        String uploadId = ApexPages.currentPage().getParameters().get('uploadId');
-        if (String.isBlank(uploadId)) { xmlContent = '<!-- Error: uploadId required -->'; return null; }
-        List<SBA641_XML_Upload__c> uploads = [SELECT Id, QuarterYear__c FROM SBA641_XML_Upload__c WHERE Id = :uploadId LIMIT 1];
-        if (uploads.isEmpty()) { xmlContent = '<!-- Error: record not found -->'; return null; }
-        String qy = uploads[0].QuarterYear__c;
-        fileName = 'SBA641_Report_' + qy + '.xml';
-        Set<Id> docIds = new Set<Id>();
-        for (ContentDocumentLink cdl : [SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = :uploadId]) {
-            docIds.add(cdl.ContentDocumentId);
+        String cvId = ApexPages.currentPage().getParameters().get('cvId');
+        if (String.isBlank(cvId)) {
+            xmlContent = '<!-- Error: cvId parameter required -->';
+            return null;
         }
-        if (docIds.isEmpty()) { xmlContent = '<!-- No files found -->'; return null; }
-        List<String> parts = new List<String>();
-        for (ContentVersion cv : [SELECT VersionData FROM ContentVersion WHERE ContentDocumentId IN :docIds AND Title LIKE :('SBA641_XML_Report_' + qy + '%') AND IsLatest = true ORDER BY Title ASC]) {
-            parts.add(cv.VersionData.toString());
+        try {
+            ContentVersion cv = [SELECT VersionData FROM ContentVersion WHERE Id = :cvId LIMIT 1];
+            xmlContent = cv.VersionData.toString();
+        } catch(Exception e) {
+            xmlContent = '<!-- Error: ' + e.getMessage() + ' -->';
         }
-        xmlContent = String.join(parts, '');
         return null;
     }
 }
-
-// Note: getUploadRecordId is in SBA641ReportController, not here
