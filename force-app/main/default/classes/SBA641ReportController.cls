@@ -309,4 +309,17 @@ public with sharing class SBA641ReportController {
     ];
     return uploads.isEmpty() ? null : uploads[0].Id;
 	}
+	// ADD to SBA641ReportController.cls before the final closing }
+ 
+    // Returns the VF base URL (vf.force.com) for direct same-session fetch() calls
+    // This avoids the lightning.force.com → vf.force.com redirect that breaks CORS
+    @AuraEnabled(cacheable=true)
+    public static String getVfBaseUrl() {
+        String orgUrl = URL.getOrgDomainUrl().toExternalForm();
+        // Convert: https://michigansbdcatgrandvalleystateuniv--fullsb.sandbox.my.salesforce.com
+        // To:      https://michigansbdcatgrandvalleystateuniv--fullsb.sandbox.vf.force.com
+        return orgUrl
+            .replace('.sandbox.my.salesforce.com', '.sandbox.vf.force.com')
+            .replace('.my.salesforce.com', '.vf.force.com');
+    }
 }

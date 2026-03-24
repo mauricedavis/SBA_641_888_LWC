@@ -8,6 +8,7 @@ import validateQuarter   from '@salesforce/apex/SBA641ReportController.validateQ
 import generateXml       from '@salesforce/apex/SBA641ReportController.generateXml';
 import getXmlPartFiles   from '@salesforce/apex/SBA641ReportController.getXmlPartFiles';
 import getUploadRecordId from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
+import getVfBaseUrl      from '@salesforce/apex/SBA641ReportController.getVfBaseUrl';
 import saveRunState      from '@salesforce/apex/SBA641ReportController.saveRunState';
 import loadRunState      from '@salesforce/apex/SBA641ReportController.loadRunState';
 import clearRunState     from '@salesforce/apex/SBA641ReportController.clearRunState';
@@ -31,19 +32,16 @@ export default class Sba641ReportingWizard extends LightningElement {
     @track existingRecordCount = 0;
     @track existingPartCount   = 0;
 
-    // Step 2
     @track isExtracting        = false;
     @track extractJobId        = null;
     @track extractedCount      = 0;
 
-    // Step 3
     @track isValidating        = false;
     @track totalRecords        = 0;
     @track errorCount          = 0;
     @track warningCount        = 0;
     @track validationResults   = [];
 
-    // Step 5
     @track xmlJobId            = null;
     @track xmlComplete         = false;
     @track showDownloadButton  = false;
@@ -51,10 +49,7 @@ export default class Sba641ReportingWizard extends LightningElement {
     @track mergeComplete       = false;
     @track mergeStatus         = '';
 
-    // ── Lifecycle ──────────────────────────────────────────────────────────────
-    connectedCallback() {
-        this._tryLoadRunState();
-    }
+    connectedCallback() { this._tryLoadRunState(); }
 
     async _tryLoadRunState() {
         try {
@@ -74,62 +69,43 @@ export default class Sba641ReportingWizard extends LightningElement {
                         this.existingPartCount = parts ? parts.length : 0;
                     } catch(e) { this.existingPartCount = 0; }
                 }
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'Run Restored',
-                    message: 'Resumed ' + state.quarterYear + ' at Step ' + state.currentStep,
-                    variant: 'info'
-                }));
             }
-        } catch(e) { /* no active run */ }
+        } catch(e) { /* no run state */ }
     }
 
-    async _save(runStatus) {
+    async _save(status) {
         try {
-            await saveRunState({
-                state: {
-                    quarterYear:     this.quarterYear,
-                    currentStep:     this.currentStep,
-                    dateLabel:       this.dateLabel,
-                    extractJobId:    this.extractJobId,
-                    extractedCount:  this.extractedCount,
-                    xmlJobId:        this.xmlJobId,
-                    runStatus:       runStatus || 'In Progress',
-                    selectedQuarter: this.selectedQuarter,
-                    selectedYear:    this.selectedYear
-                }
-            });
-        } catch(e) { console.error('saveRunState failed:', e); }
+            await saveRunState({ state: {
+                quarterYear: this.quarterYear, currentStep: this.currentStep,
+                dateLabel: this.dateLabel, extractJobId: this.extractJobId,
+                extractedCount: this.extractedCount, xmlJobId: this.xmlJobId,
+                runStatus: status || 'In Progress',
+                selectedQuarter: this.selectedQuarter, selectedYear: this.selectedYear
+            }});
+        } catch(e) {}
     }
 
-    // ── Step visibility ────────────────────────────────────────────────────────
-    get isStep1() { return this.currentStep === 1; }
-    get isStep2() { return this.currentStep === 2; }
-    get isStep3() { return this.currentStep === 3; }
-    get isStep4() { return this.currentStep === 4; }
-    get isStep5() { return this.currentStep === 5; }
-    get currentStepStr()         { return String(this.currentStep); }
-    get showValidationPanel()    { return this.currentStep >= 3 && this.validationResults.length > 0; }
+    get isStep1()             { return this.currentStep === 1; }
+    get isStep2()             { return this.currentStep === 2; }
+    get isStep3()             { return this.currentStep === 3; }
+    get isStep4()             { return this.currentStep === 4; }
+    get isStep5()             { return this.currentStep === 5; }
+    get currentStepStr()      { return String(this.currentStep); }
+    get showValidationPanel() { return this.currentStep >= 3 && this.validationResults.length > 0; }
     get quarterYear() {
         return this.selectedQuarter && this.selectedYear
             ? (this.selectedQuarter + '_' + this.selectedYear) : '';
     }
-    get quarterOptions()         { return QUARTER_OPTIONS; }
-    get yearOptions()            { return YEAR_OPTIONS; }
-    get isNextDisabled()         { return !this.selectedQuarter || !this.selectedYear; }
-    get noRecordsExtracted()     { return this.extractedCount === 0; }
-    get hasErrors()              { return this.errorCount > 0; }
-    get hasWarnings()            { return this.warningCount > 0; }
-    get generateButtonVariant()  { return this.existingPartCount > 0 ? 'neutral' : 'brand'; }
+    get quarterOptions()        { return QUARTER_OPTIONS; }
+    get yearOptions()           { return YEAR_OPTIONS; }
+    get isNextDisabled()        { return !this.selectedQuarter || !this.selectedYear; }
+    get noRecordsExtracted()    { return this.extractedCount === 0; }
+    get hasErrors()             { return this.errorCount > 0; }
+    get hasWarnings()           { return this.warningCount > 0; }
+    get generateButtonVariant() { return this.existingPartCount > 0 ? 'neutral' : 'brand'; }
 
-    // ── Step 1 ─────────────────────────────────────────────────────────────────
-    handleQuarterChange(e) {
-        this.selectedQuarter = e.detail.value;
-        this._updateDateLabel();
-    }
-    handleYearChange(e) {
-        this.selectedYear = e.detail.value;
-        this._updateDateLabel();
-    }
+    handleQuarterChange(e) { this.selectedQuarter = e.detail.value; this._updateDateLabel(); }
+    handleYearChange(e)    { this.selectedYear    = e.detail.value; this._updateDateLabel(); }
 
     async _updateDateLabel() {
         if (!this.selectedQuarter || !this.selectedYear) return;
@@ -140,11 +116,7 @@ export default class Sba641ReportingWizard extends LightningElement {
             this.existingRecordCount = cnt || 0;
             const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
             this.existingPartCount = parts ? parts.length : 0;
-        } catch(e) {
-            this.dateLabel = '';
-            this.existingRecordCount = 0;
-            this.existingPartCount = 0;
-        }
+        } catch(e) { this.dateLabel = ''; this.existingRecordCount = 0; this.existingPartCount = 0; }
     }
 
     async handleSkipToValidate() {
@@ -164,27 +136,20 @@ export default class Sba641ReportingWizard extends LightningElement {
     async handleExtract() {
         const rtOk = await recordTypeExists({ quarterYear: this.quarterYear });
         if (!rtOk) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Record Type Missing',
-                message: 'No Record Type "' + this.quarterYear + '" exists on SBA 641 Output.',
-                variant: 'error', mode: 'sticky'
-            }));
+            this.dispatchEvent(new ShowToastEvent({ title: 'Record Type Missing',
+                message: 'No Record Type "' + this.quarterYear + '" on SBA 641 Output.',
+                variant: 'error', mode: 'sticky' }));
             return;
         }
-        this.currentStep         = 2;
-        this.isExtracting        = true;
-        this.existingRecordCount = 0;
+        this.currentStep = 2; this.isExtracting = true; this.existingRecordCount = 0;
         await this._save('In Progress');
         try {
             this.extractJobId = await extractSessions({ quarterYear: this.quarterYear });
             await this._save('In Progress');
         } catch(e) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Extraction Error',
-                message: e.body ? e.body.message : e.message, variant: 'error'
-            }));
-            this.currentStep  = 1;
-            this.isExtracting = false;
+            this.dispatchEvent(new ShowToastEvent({ title: 'Extraction Error',
+                message: e.body ? e.body.message : e.message, variant: 'error' }));
+            this.currentStep = 1; this.isExtracting = false;
         }
     }
 
@@ -194,42 +159,25 @@ export default class Sba641ReportingWizard extends LightningElement {
         if (status === 'Completed') {
             try { this.extractedCount = await getOutputCount({ quarterYear: this.quarterYear }); }
             catch(err) { this.extractedCount = 0; }
-            if (this.extractedCount === 0) {
-                this.dispatchEvent(new ShowToastEvent({
-                    title: 'No Records Found',
-                    message: 'No sessions found for ' + this.quarterYear + '.',
-                    variant: 'warning', mode: 'sticky'
-                }));
-            }
         } else {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Extraction Failed',
-                message: 'Batch ended with status: ' + status,
-                variant: 'error'
-            }));
+            this.dispatchEvent(new ShowToastEvent({ title: 'Extraction Failed',
+                message: 'Batch ended with status: ' + status, variant: 'error' }));
         }
         await this._save('In Progress');
     }
 
     async handleValidate() {
-        this.currentStep  = 3;
-        this.isValidating = true;
+        this.currentStep = 3; this.isValidating = true;
         try {
             const res = await validateQuarter({ quarterYear: this.quarterYear });
-            this.totalRecords      = res.totalRecords;
-            this.errorCount        = res.errorCount;
-            this.warningCount      = res.warningCount;
-            this.validationResults = res.results;
+            this.totalRecords = res.totalRecords; this.errorCount = res.errorCount;
+            this.warningCount = res.warningCount; this.validationResults = res.results;
             await this._save('In Progress');
         } catch(e) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Validation Error',
-                message: e.body ? e.body.message : e.message, variant: 'error'
-            }));
+            this.dispatchEvent(new ShowToastEvent({ title: 'Validation Error',
+                message: e.body ? e.body.message : e.message, variant: 'error' }));
             this.currentStep = 2;
-        } finally {
-            this.isValidating = false;
-        }
+        } finally { this.isValidating = false; }
     }
 
     async handleProceedToReview() {
@@ -247,10 +195,8 @@ export default class Sba641ReportingWizard extends LightningElement {
             this.currentStep = 5;
             await this._save('In Progress');
         } catch(e) {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Generation Error',
-                message: e.body ? e.body.message : e.message, variant: 'error'
-            }));
+            this.dispatchEvent(new ShowToastEvent({ title: 'Generation Error',
+                message: e.body ? e.body.message : e.message, variant: 'error' }));
         }
     }
 
@@ -258,50 +204,46 @@ export default class Sba641ReportingWizard extends LightningElement {
         const { status } = e.detail;
         await this._save(status === 'Completed' ? 'Complete' : 'Failed');
         if (status === 'Completed') {
-            this.xmlComplete        = true;
-            this.showDownloadButton = true;
+            this.xmlComplete = true; this.showDownloadButton = true;
             try {
                 const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
                 this.existingPartCount = parts ? parts.length : 0;
             } catch(err) { this.existingPartCount = 0; }
         } else {
-            this.dispatchEvent(new ShowToastEvent({
-                title: 'Generation Failed',
-                message: 'Batch ended with status: ' + status,
-                variant: 'error', mode: 'sticky'
-            }));
+            this.dispatchEvent(new ShowToastEvent({ title: 'Generation Failed',
+                message: 'Batch ended with status: ' + status, variant: 'error', mode: 'sticky' }));
         }
     }
 
-  // REPLACE handleDownloadAndMerge() in sba641ReportingWizard.js with this version.
-// Uses Apex REST endpoint — same origin as LWC, no CORS issues, no redirect.
- 
+    // ── Download & Merge ───────────────────────────────────────────────────────
+    // Uses VF base URL (vf.force.com) to avoid lightning.force.com redirect/CORS
     async handleDownloadAndMerge() {
-        this.isMerging     = true;
-        this.mergeComplete = false;
-        this.mergeStatus   = 'Looking up upload record\u2026';
+        this.isMerging = true; this.mergeComplete = false;
+        this.mergeStatus = 'Preparing download\u2026';
         try {
-            const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
-            if (!uploadId) {
-                this.mergeStatus = 'No upload record found. Please re-generate XML.';
+            const [parts, vfBase] = await Promise.all([
+                getXmlPartFiles({ quarterYear: this.quarterYear }),
+                getVfBaseUrl()
+            ]);
+
+            if (!parts || parts.length === 0) {
+                this.mergeStatus = 'No part files found. Please re-generate XML.';
                 this.isMerging   = false;
                 return;
             }
- 
-            this.mergeStatus = 'Downloading and merging XML\u2026';
-            const url  = '/services/apexrest/SBA641XML?uploadId=' + uploadId;
-            const resp = await fetch(url, {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/xml' }
-            });
- 
-            if (!resp.ok) {
-                throw new Error('Download failed: HTTP ' + resp.status);
+
+            const textParts = [];
+            for (let i = 0; i < parts.length; i++) {
+                this.mergeStatus = 'Downloading part ' + (i + 1) + ' of ' + parts.length + '\u2026';
+                // Use vf.force.com base URL directly — avoids cross-origin redirect
+                const url  = vfBase + '/apex/SBA641_XMLDownload?cvId=' + parts[i].cvId;
+                const resp = await fetch(url, { credentials: 'include' });
+                if (!resp.ok) throw new Error('Part ' + (i + 1) + ' failed: HTTP ' + resp.status);
+                textParts.push(await resp.text());
             }
- 
-            this.mergeStatus = 'Preparing file download\u2026';
-            const xmlText = await resp.text();
-            const blob    = new Blob([xmlText], { type: 'application/xml' });
+
+            this.mergeStatus = 'Creating merged file\u2026';
+            const blob    = new Blob(textParts, { type: 'application/xml' });
             const blobUrl = URL.createObjectURL(blob);
             const link    = document.createElement('a');
             link.href     = blobUrl;
@@ -310,44 +252,32 @@ export default class Sba641ReportingWizard extends LightningElement {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(blobUrl);
- 
+
             this.isMerging          = false;
             this.mergeComplete      = true;
             this.mergeStatus        = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
             this.showDownloadButton = false;
             this.existingPartCount  = 0;
- 
+
         } catch(err) {
             console.error('Download error:', err);
             this.isMerging   = false;
             this.mergeStatus = 'Error: ' + (err.message || String(err));
         }
     }
- 
 
     async handleBack() {
-        if (this.currentStep > 1) {
-            this.currentStep--;
-            await this._save('In Progress');
-        }
+        if (this.currentStep > 1) { this.currentStep--; await this._save('In Progress'); }
     }
 
     async handleStartOver() {
         try { await clearRunState(); } catch(e) {}
-        this.currentStep         = 1;
-        this.selectedQuarter     = '';
-        this.dateLabel           = '';
-        this.existingRecordCount = 0;
-        this.existingPartCount   = 0;
-        this.extractJobId        = null;
-        this.extractedCount      = 0;
-        this.xmlJobId            = null;
-        this.validationResults   = [];
-        this.errorCount          = 0;
-        this.warningCount        = 0;
-        this.mergeComplete       = false;
-        this.mergeStatus         = '';
-        this.xmlComplete         = false;
-        this.showDownloadButton  = false;
+        this.currentStep = 1; this.selectedQuarter = ''; this.dateLabel = '';
+        this.existingRecordCount = 0; this.existingPartCount = 0;
+        this.extractJobId = null; this.extractedCount = 0;
+        this.xmlJobId = null; this.validationResults = [];
+        this.errorCount = 0; this.warningCount = 0;
+        this.mergeComplete = false; this.mergeStatus = '';
+        this.xmlComplete = false; this.showDownloadButton = false;
     }
 }
