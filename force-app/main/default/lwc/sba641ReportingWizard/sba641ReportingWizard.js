@@ -1,4 +1,3 @@
-import getUploadRecordId   from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getQuarterDates   from '@salesforce/apex/SBA641ReportController.getQuarterDates';
@@ -8,6 +7,7 @@ import getOutputCount    from '@salesforce/apex/SBA641ReportController.getOutput
 import validateQuarter   from '@salesforce/apex/SBA641ReportController.validateQuarter';
 import generateXml       from '@salesforce/apex/SBA641ReportController.generateXml';
 import getXmlPartFiles   from '@salesforce/apex/SBA641ReportController.getXmlPartFiles';
+import getUploadRecordId from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
 import saveRunState      from '@salesforce/apex/SBA641ReportController.saveRunState';
 import loadRunState      from '@salesforce/apex/SBA641ReportController.loadRunState';
 import clearRunState     from '@salesforce/apex/SBA641ReportController.clearRunState';
@@ -31,20 +31,25 @@ export default class Sba641ReportingWizard extends LightningElement {
     @track existingRecordCount = 0;
     @track existingPartCount   = 0;
 
-    // Step 2 — Extract
+    // Step 2
     @track isExtracting        = false;
     @track extractJobId        = null;
     @track extractedCount      = 0;
 
-    // Step 3 — Validate
+    // Step 3
     @track isValidating        = false;
     @track totalRecords        = 0;
     @track errorCount          = 0;
     @track warningCount        = 0;
     @track validationResults   = [];
 
-    // Step 5 — Generate
+    // Step 5
     @track xmlJobId            = null;
+    @track xmlComplete         = false;
+    @track showDownloadButton  = false;
+    @track isMerging           = false;
+    @track mergeComplete       = false;
+    @track mergeStatus         = '';
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
     connectedCallback() {
@@ -55,15 +60,14 @@ export default class Sba641ReportingWizard extends LightningElement {
         try {
             const state = await loadRunState();
             if (state && state.currentStep > 1) {
-                this.selectedQuarter  = state.selectedQuarter || '';
-                this.selectedYear     = state.selectedYear    || String(new Date().getFullYear());
-                this.dateLabel        = state.dateLabel       || '';
-                this.extractJobId     = state.extractJobId    || null;
-                this.extractedCount   = state.extractedCount  || 0;
-                this.xmlJobId         = state.xmlJobId        || null;
-                this.currentStep      = state.currentStep     || 1;
+                this.selectedQuarter = state.selectedQuarter || '';
+                this.selectedYear    = state.selectedYear    || String(new Date().getFullYear());
+                this.dateLabel       = state.dateLabel       || '';
+                this.extractJobId    = state.extractJobId    || null;
+                this.extractedCount  = state.extractedCount  || 0;
+                this.xmlJobId        = state.xmlJobId        || null;
+                this.currentStep     = state.currentStep     || 1;
                 if (this.currentStep === 2 && this.extractJobId) this.isExtracting = true;
-                // Check for existing XML parts if on step 4 or beyond
                 if (this.currentStep >= 4 && this.quarterYear) {
                     try {
                         const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
@@ -72,14 +76,13 @@ export default class Sba641ReportingWizard extends LightningElement {
                 }
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'Run Restored',
-                    message: `Resumed ${state.quarterYear} at Step ${state.currentStep}`,
+                    message: 'Resumed ' + state.quarterYear + ' at Step ' + state.currentStep,
                     variant: 'info'
                 }));
             }
         } catch(e) { /* no active run */ }
     }
 
-    // ── Auto-save ──────────────────────────────────────────────────────────────
     async _save(runStatus) {
         try {
             await saveRunState({
@@ -104,21 +107,21 @@ export default class Sba641ReportingWizard extends LightningElement {
     get isStep3() { return this.currentStep === 3; }
     get isStep4() { return this.currentStep === 4; }
     get isStep5() { return this.currentStep === 5; }
-    get currentStepStr()      { return String(this.currentStep); }
-    get showValidationPanel() { return this.currentStep >= 3 && this.validationResults.length > 0; }
+    get currentStepStr()         { return String(this.currentStep); }
+    get showValidationPanel()    { return this.currentStep >= 3 && this.validationResults.length > 0; }
     get quarterYear() {
         return this.selectedQuarter && this.selectedYear
-            ? `${this.selectedQuarter}_${this.selectedYear}` : '';
+            ? (this.selectedQuarter + '_' + this.selectedYear) : '';
     }
-    get quarterOptions()     { return QUARTER_OPTIONS; }
-    get yearOptions()        { return YEAR_OPTIONS; }
-    get isNextDisabled()       { return !this.selectedQuarter || !this.selectedYear; }
+    get quarterOptions()         { return QUARTER_OPTIONS; }
+    get yearOptions()            { return YEAR_OPTIONS; }
+    get isNextDisabled()         { return !this.selectedQuarter || !this.selectedYear; }
+    get noRecordsExtracted()     { return this.extractedCount === 0; }
+    get hasErrors()              { return this.errorCount > 0; }
+    get hasWarnings()            { return this.warningCount > 0; }
     get generateButtonVariant()  { return this.existingPartCount > 0 ? 'neutral' : 'brand'; }
-    get noRecordsExtracted() { return this.extractedCount === 0; }
-    get hasErrors()          { return this.errorCount > 0; }
-    get hasWarnings()        { return this.warningCount > 0; }
 
-    // ── Step 1: Select Quarter ─────────────────────────────────────────────────
+    // ── Step 1 ─────────────────────────────────────────────────────────────────
     handleQuarterChange(e) {
         this.selectedQuarter = e.detail.value;
         this._updateDateLabel();
@@ -133,16 +136,10 @@ export default class Sba641ReportingWizard extends LightningElement {
         try {
             const dates = await getQuarterDates({ quarterYear: this.quarterYear });
             this.dateLabel = dates.label;
-            // Check for existing output records
             const cnt = await getOutputCount({ quarterYear: this.quarterYear });
             this.existingRecordCount = cnt || 0;
-            // Check for existing XML part files — show download button if found
             const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
-            if (parts && parts.length > 0) {
-                this.existingPartCount = parts.length;
-            } else {
-                this.existingPartCount = 0;
-            }
+            this.existingPartCount = parts ? parts.length : 0;
         } catch(e) {
             this.dateLabel = '';
             this.existingRecordCount = 0;
@@ -150,15 +147,6 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-    // Re-generate XML — jump to Step 4 using existing extracted records
-    async handleReGenerate() {
-        this.extractedCount    = this.existingRecordCount;
-        this.existingPartCount = 0;
-        this.currentStep       = 4;
-        await this._save('In Progress');
-    }
-
-    // Skip extraction — jump straight to validate using existing records
     async handleSkipToValidate() {
         this.extractedCount = this.existingRecordCount;
         this.currentStep    = 3;
@@ -166,12 +154,19 @@ export default class Sba641ReportingWizard extends LightningElement {
         await this.handleValidate();
     }
 
+    async handleReGenerate() {
+        this.extractedCount    = this.existingRecordCount;
+        this.existingPartCount = 0;
+        this.currentStep       = 4;
+        await this._save('In Progress');
+    }
+
     async handleExtract() {
         const rtOk = await recordTypeExists({ quarterYear: this.quarterYear });
         if (!rtOk) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Record Type Missing',
-                message: `No Record Type "${this.quarterYear}" exists on SBA 641 Output.`,
+                message: 'No Record Type "' + this.quarterYear + '" exists on SBA 641 Output.',
                 variant: 'error', mode: 'sticky'
             }));
             return;
@@ -186,7 +181,7 @@ export default class Sba641ReportingWizard extends LightningElement {
         } catch(e) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Extraction Error',
-                message: e.body?.message || e.message, variant: 'error'
+                message: e.body ? e.body.message : e.message, variant: 'error'
             }));
             this.currentStep  = 1;
             this.isExtracting = false;
@@ -202,14 +197,14 @@ export default class Sba641ReportingWizard extends LightningElement {
             if (this.extractedCount === 0) {
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'No Records Found',
-                    message: `No sessions found for ${this.quarterYear}.`,
+                    message: 'No sessions found for ' + this.quarterYear + '.',
                     variant: 'warning', mode: 'sticky'
                 }));
             }
         } else {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Extraction Failed',
-                message: `Batch ended with status: ${status}`,
+                message: 'Batch ended with status: ' + status,
                 variant: 'error'
             }));
         }
@@ -229,7 +224,7 @@ export default class Sba641ReportingWizard extends LightningElement {
         } catch(e) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Validation Error',
-                message: e.body?.message || e.message, variant: 'error'
+                message: e.body ? e.body.message : e.message, variant: 'error'
             }));
             this.currentStep = 2;
         } finally {
@@ -240,7 +235,6 @@ export default class Sba641ReportingWizard extends LightningElement {
     async handleProceedToReview() {
         this.currentStep = 4;
         await this._save('In Progress');
-        // Check if XML parts already exist for this quarter
         try {
             const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
             this.existingPartCount = parts ? parts.length : 0;
@@ -249,15 +243,13 @@ export default class Sba641ReportingWizard extends LightningElement {
 
     async handleGenerate() {
         try {
-            this.xmlJobId = await generateXml({
-                quarterYear: this.quarterYear, reportType: 'Counseling'
-            });
+            this.xmlJobId    = await generateXml({ quarterYear: this.quarterYear, reportType: 'Counseling' });
             this.currentStep = 5;
             await this._save('In Progress');
         } catch(e) {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Generation Error',
-                message: e.body?.message || e.message, variant: 'error'
+                message: e.body ? e.body.message : e.message, variant: 'error'
             }));
         }
     }
@@ -268,21 +260,24 @@ export default class Sba641ReportingWizard extends LightningElement {
         if (status === 'Completed') {
             this.xmlComplete        = true;
             this.showDownloadButton = true;
+            try {
+                const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
+                this.existingPartCount = parts ? parts.length : 0;
+            } catch(err) { this.existingPartCount = 0; }
         } else {
             this.dispatchEvent(new ShowToastEvent({
                 title: 'Generation Failed',
-                message: `Batch ended with status: ${status}`,
+                message: 'Batch ended with status: ' + status,
                 variant: 'error', mode: 'sticky'
             }));
         }
     }
 
-// REPLACE handleDownloadAndMerge() in sba641ReportingWizard.js with this version.
-// Uses VF page as same-origin proxy to fetch each part, merges in browser, single download.
- 
+    // ── Download & Merge ───────────────────────────────────────────────────────
     async handleDownloadAndMerge() {
-        this.isMerging   = true;
-        this.mergeStatus = 'Looking up part files\u2026';
+        this.isMerging     = true;
+        this.mergeComplete = false;
+        this.mergeStatus   = 'Looking up part files\u2026';
         try {
             const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
             if (!parts || parts.length === 0) {
@@ -290,35 +285,42 @@ export default class Sba641ReportingWizard extends LightningElement {
                 this.isMerging   = false;
                 return;
             }
- 
+
             const textParts = [];
             for (let i = 0; i < parts.length; i++) {
-                this.mergeStatus = `Downloading part ${i + 1} of ${parts.length}\u2026`;
-                // VF page is same-origin — fetch() is allowed by LWC CSP
-                const url = `/apex/SBA641_XMLDownload?cvId=${parts[i].cvId}`;
+                this.mergeStatus = 'Downloading part ' + (i + 1) + ' of ' + parts.length + '\u2026';
+                const url  = '/apex/SBA641_XMLDownload?cvId=' + parts[i].cvId;
                 const resp = await fetch(url, { credentials: 'same-origin' });
-                if (!resp.ok) throw new Error(`Part ${i + 1} failed: HTTP ${resp.status}`);
+                if (!resp.ok) {
+                    throw new Error('Part ' + (i + 1) + ' failed: HTTP ' + resp.status);
+                }
                 textParts.push(await resp.text());
             }
- 
+
             this.mergeStatus = 'Creating merged file\u2026';
             const merged  = textParts.join('');
             const blob    = new Blob([merged], { type: 'application/xml' });
             const blobUrl = URL.createObjectURL(blob);
             const link    = document.createElement('a');
             link.href     = blobUrl;
-            link.download = `SBA641_Report_${this.quarterYear}.xml`;
+            link.download = 'SBA641_Report_' + this.quarterYear + '.xml';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(blobUrl);
- 
+
             this.isMerging          = false;
             this.mergeComplete      = true;
             this.mergeStatus        = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
             this.showDownloadButton = false;
             this.existingPartCount  = 0;
- 
+
+        } catch(err) {
+            console.error('Download error:', err);
+            this.isMerging   = false;
+            this.mergeStatus = 'Error: ' + (err.message || String(err));
+        }
+    }
 
     async handleBack() {
         if (this.currentStep > 1) {
@@ -334,13 +336,15 @@ export default class Sba641ReportingWizard extends LightningElement {
         this.dateLabel           = '';
         this.existingRecordCount = 0;
         this.existingPartCount   = 0;
-        this.mergeComplete       = false;
-        this.mergeStatus         = '';
         this.extractJobId        = null;
         this.extractedCount      = 0;
         this.xmlJobId            = null;
         this.validationResults   = [];
         this.errorCount          = 0;
         this.warningCount        = 0;
+        this.mergeComplete       = false;
+        this.mergeStatus         = '';
+        this.xmlComplete         = false;
+        this.showDownloadButton  = false;
     }
 }
