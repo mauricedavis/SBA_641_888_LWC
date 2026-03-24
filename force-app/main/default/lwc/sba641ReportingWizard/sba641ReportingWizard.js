@@ -62,6 +62,13 @@ export default class Sba641ReportingWizard extends LightningElement {
                 this.xmlJobId         = state.xmlJobId        || null;
                 this.currentStep      = state.currentStep     || 1;
                 if (this.currentStep === 2 && this.extractJobId) this.isExtracting = true;
+                // Check for existing XML parts if on step 4 or beyond
+                if (this.currentStep >= 4 && this.quarterYear) {
+                    try {
+                        const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
+                        this.existingPartCount = parts ? parts.length : 0;
+                    } catch(e) { this.existingPartCount = 0; }
+                }
                 this.dispatchEvent(new ShowToastEvent({
                     title: 'Run Restored',
                     message: `Resumed ${state.quarterYear} at Step ${state.currentStep}`,
@@ -104,7 +111,8 @@ export default class Sba641ReportingWizard extends LightningElement {
     }
     get quarterOptions()     { return QUARTER_OPTIONS; }
     get yearOptions()        { return YEAR_OPTIONS; }
-    get isNextDisabled()     { return !this.selectedQuarter || !this.selectedYear; }
+    get isNextDisabled()       { return !this.selectedQuarter || !this.selectedYear; }
+    get generateButtonVariant()  { return this.existingPartCount > 0 ? 'neutral' : 'brand'; }
     get noRecordsExtracted() { return this.extractedCount === 0; }
     get hasErrors()          { return this.errorCount > 0; }
     get hasWarnings()        { return this.warningCount > 0; }
@@ -231,6 +239,11 @@ export default class Sba641ReportingWizard extends LightningElement {
     async handleProceedToReview() {
         this.currentStep = 4;
         await this._save('In Progress');
+        // Check if XML parts already exist for this quarter
+        try {
+            const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
+            this.existingPartCount = parts ? parts.length : 0;
+        } catch(e) { this.existingPartCount = 0; }
     }
 
     async handleGenerate() {

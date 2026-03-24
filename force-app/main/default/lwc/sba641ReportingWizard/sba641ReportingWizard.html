@@ -186,10 +186,24 @@
                             <strong>{warningCount}</strong> warning(s) &#x2014; will not block XML generation
                         </p>
                     </div>
+                    <!-- Show download button if XML parts already exist -->
+                    <template if:true={existingPartCount}>
+                        <div class="slds-notify slds-notify_alert slds-theme_success slds-m-vertical_small" role="alert">
+                            <lightning-icon icon-name="utility:file" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                            XML already generated for <strong>{quarterYear}</strong> ({existingPartCount} part file(s) ready).
+                        </div>
+                    </template>
+
                     <div class="slds-grid slds-gutters">
                         <div class="slds-col"><lightning-button label="&#x2190; Back" onclick={handleBack}></lightning-button></div>
                         <div class="slds-col slds-text-align_right">
-                            <lightning-button label="Generate XML" variant="brand" onclick={handleGenerate}></lightning-button>
+                            <template if:true={existingPartCount}>
+                                <lightning-button label="&#x2B07; Download &amp; Merge XML" variant="brand"
+                                    icon-name="utility:download" onclick={handleDownloadAndMerge}
+                                    class="slds-m-right_x-small">
+                                </lightning-button>
+                            </template>
+                            <lightning-button label="Generate XML" variant={generateButtonVariant} onclick={handleGenerate}></lightning-button>
                         </div>
                     </div>
                 </template>
