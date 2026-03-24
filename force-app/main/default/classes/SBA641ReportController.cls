@@ -274,14 +274,21 @@ public with sharing class SBA641ReportController {
 
         Id uploadId = uploads[0].Id;
 
-        // Get all linked ContentVersions that are part files, ordered by title
+        // Step 1: Get ContentDocument Ids linked to the upload record
+        Set<Id> docIds = new Set<Id>();
+        for (ContentDocumentLink cdl : [
+            SELECT ContentDocumentId FROM ContentDocumentLink
+            WHERE LinkedEntityId = :uploadId
+        ]) {
+            docIds.add(cdl.ContentDocumentId);
+        }
+        if (docIds.isEmpty()) return result;
+
+        // Step 2: Get matching ContentVersions ordered by title
         for (ContentVersion cv : [
             SELECT Id, Title, ContentDocumentId
             FROM ContentVersion
-            WHERE ContentDocumentId IN (
-                SELECT ContentDocumentId FROM ContentDocumentLink
-                WHERE LinkedEntityId = :uploadId
-            )
+            WHERE ContentDocumentId IN :docIds
             AND Title LIKE :('SBA641_XML_Report_' + quarterYear + '%')
             AND IsLatest = true
             ORDER BY Title ASC
