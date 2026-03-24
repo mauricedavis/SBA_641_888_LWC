@@ -256,7 +256,6 @@ public with sharing class SBA641ReportController {
             System.debug('clearRunState failed: ' + e.getMessage());
         }
     }
-}
 
     // ── Get part file ContentVersions for client-side merge ───────────────────
     // Returns ordered list of {cvId, title} for all parts linked to the
