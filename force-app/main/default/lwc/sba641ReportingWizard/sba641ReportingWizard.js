@@ -277,49 +277,48 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-// REPLACE the entire handleDownloadAndMerge() method in sba641ReportingWizard.js with this:
+// REPLACE handleDownloadAndMerge() in sba641ReportingWizard.js with this version.
+// Uses VF page as same-origin proxy to fetch each part, merges in browser, single download.
  
     async handleDownloadAndMerge() {
-        console.log('handleDownloadAndMerge called, quarterYear:', this.quarterYear);
         this.isMerging   = true;
         this.mergeStatus = 'Looking up part files\u2026';
         try {
-            console.log('Calling getXmlPartFiles...');
             const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
-            console.log('Parts returned:', JSON.stringify(parts));
- 
             if (!parts || parts.length === 0) {
-                this.mergeStatus = 'No part files found for ' + this.quarterYear + '. Please re-generate XML.';
+                this.mergeStatus = 'No part files found. Please re-generate the XML.';
                 this.isMerging   = false;
                 return;
             }
  
-            // Download each part directly via shepherd URL — no fetch needed
-            this.mergeStatus = 'Starting download of ' + parts.length + ' parts\u2026';
+            const textParts = [];
             for (let i = 0; i < parts.length; i++) {
-                await new Promise(resolve => setTimeout(resolve, i * 500));
-                this.mergeStatus = 'Downloading part ' + (i + 1) + ' of ' + parts.length + '\u2026';
-                const a = document.createElement('a');
-                a.href = '/sfc/servlet.shepherd/version/download/' + parts[i].cvId;
-                a.download = parts[i].title + '.xml';
-                a.target = '_blank';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                this.mergeStatus = `Downloading part ${i + 1} of ${parts.length}\u2026`;
+                // VF page is same-origin — fetch() is allowed by LWC CSP
+                const url = `/apex/SBA641_XMLDownload?cvId=${parts[i].cvId}`;
+                const resp = await fetch(url, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error(`Part ${i + 1} failed: HTTP ${resp.status}`);
+                textParts.push(await resp.text());
             }
  
-            this.isMerging     = false;
-            this.mergeComplete = true;
-            this.mergeStatus   = '\u2705 ' + parts.length + ' parts downloaded. Now concatenate using:\n' +
-                'Windows: Use the PowerShell command emailed to you.';
-            this.showDownloadButton = false;
+            this.mergeStatus = 'Creating merged file\u2026';
+            const merged  = textParts.join('');
+            const blob    = new Blob([merged], { type: 'application/xml' });
+            const blobUrl = URL.createObjectURL(blob);
+            const link    = document.createElement('a');
+            link.href     = blobUrl;
+            link.download = `SBA641_Report_${this.quarterYear}.xml`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
  
-        } catch(err) {
-            console.error('handleDownloadAndMerge error:', err);
-            this.isMerging   = false;
-            this.mergeStatus = 'Error: ' + (err.body ? err.body.message : err.message || String(err));
-        }
-    }
+            this.isMerging          = false;
+            this.mergeComplete      = true;
+            this.mergeStatus        = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
+            this.showDownloadButton = false;
+            this.existingPartCount  = 0;
+ 
 
     async handleBack() {
         if (this.currentStep > 1) {
