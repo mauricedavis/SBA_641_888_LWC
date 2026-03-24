@@ -273,33 +273,35 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-    // ── Download & Merge ───────────────────────────────────────────────────────
+  // REPLACE handleDownloadAndMerge() in sba641ReportingWizard.js with this version.
+// Uses Apex REST endpoint — same origin as LWC, no CORS issues, no redirect.
+ 
     async handleDownloadAndMerge() {
         this.isMerging     = true;
         this.mergeComplete = false;
-        this.mergeStatus   = 'Looking up part files\u2026';
+        this.mergeStatus   = 'Looking up upload record\u2026';
         try {
-            const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
-            if (!parts || parts.length === 0) {
-                this.mergeStatus = 'No part files found. Please re-generate the XML.';
+            const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
+            if (!uploadId) {
+                this.mergeStatus = 'No upload record found. Please re-generate XML.';
                 this.isMerging   = false;
                 return;
             }
-
-            const textParts = [];
-            for (let i = 0; i < parts.length; i++) {
-                this.mergeStatus = 'Downloading part ' + (i + 1) + ' of ' + parts.length + '\u2026';
-                const url  = '/apex/SBA641_XMLDownload?cvId=' + parts[i].cvId;
-                const resp = await fetch(url, { credentials: 'same-origin' });
-                if (!resp.ok) {
-                    throw new Error('Part ' + (i + 1) + ' failed: HTTP ' + resp.status);
-                }
-                textParts.push(await resp.text());
+ 
+            this.mergeStatus = 'Downloading and merging XML\u2026';
+            const url  = '/services/apexrest/SBA641XML?uploadId=' + uploadId;
+            const resp = await fetch(url, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/xml' }
+            });
+ 
+            if (!resp.ok) {
+                throw new Error('Download failed: HTTP ' + resp.status);
             }
-
-            this.mergeStatus = 'Creating merged file\u2026';
-            const merged  = textParts.join('');
-            const blob    = new Blob([merged], { type: 'application/xml' });
+ 
+            this.mergeStatus = 'Preparing file download\u2026';
+            const xmlText = await resp.text();
+            const blob    = new Blob([xmlText], { type: 'application/xml' });
             const blobUrl = URL.createObjectURL(blob);
             const link    = document.createElement('a');
             link.href     = blobUrl;
@@ -308,19 +310,20 @@ export default class Sba641ReportingWizard extends LightningElement {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(blobUrl);
-
+ 
             this.isMerging          = false;
             this.mergeComplete      = true;
             this.mergeStatus        = '\u2705 Done! SBA641_Report_' + this.quarterYear + '.xml downloaded.';
             this.showDownloadButton = false;
             this.existingPartCount  = 0;
-
+ 
         } catch(err) {
             console.error('Download error:', err);
             this.isMerging   = false;
             this.mergeStatus = 'Error: ' + (err.message || String(err));
         }
     }
+ 
 
     async handleBack() {
         if (this.currentStep > 1) {
