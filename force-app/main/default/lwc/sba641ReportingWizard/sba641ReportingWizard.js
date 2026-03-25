@@ -1,5 +1,3 @@
-// ADD this import at the top of sba641ReportingWizard.js:
-import getUploadRecordId from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getQuarterDates   from '@salesforce/apex/SBA641ReportController.getQuarterDates';
@@ -10,7 +8,6 @@ import validateQuarter   from '@salesforce/apex/SBA641ReportController.validateQ
 import generateXml       from '@salesforce/apex/SBA641ReportController.generateXml';
 import getXmlPartFiles   from '@salesforce/apex/SBA641ReportController.getXmlPartFiles';
 import getUploadRecordId from '@salesforce/apex/SBA641ReportController.getUploadRecordId';
-import getVfBaseUrl      from '@salesforce/apex/SBA641ReportController.getVfBaseUrl';
 import saveRunState      from '@salesforce/apex/SBA641ReportController.saveRunState';
 import loadRunState      from '@salesforce/apex/SBA641ReportController.loadRunState';
 import clearRunState     from '@salesforce/apex/SBA641ReportController.clearRunState';
@@ -118,7 +115,11 @@ export default class Sba641ReportingWizard extends LightningElement {
             this.existingRecordCount = cnt || 0;
             const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
             this.existingPartCount = parts ? parts.length : 0;
-        } catch(e) { this.dateLabel = ''; this.existingRecordCount = 0; this.existingPartCount = 0; }
+        } catch(e) {
+            this.dateLabel = '';
+            this.existingRecordCount = 0;
+            this.existingPartCount   = 0;
+        }
     }
 
     async handleSkipToValidate() {
@@ -217,10 +218,9 @@ export default class Sba641ReportingWizard extends LightningElement {
         }
     }
 
-// REPLACE handleDownloadAndMerge() with this version:
-// Opens the VF merge page in a new tab — no CORS (full browser navigation)
-// VF page auto-downloads all parts and shows PowerShell merge command
- 
+    // ── Download & Merge ───────────────────────────────────────────────────────
+    // Opens VF merge page in new tab — full browser navigation, no CORS issues.
+    // VF page auto-downloads all parts and shows PowerShell merge command.
     async handleDownloadAndMerge() {
         this.isMerging     = true;
         this.mergeComplete = false;
@@ -232,14 +232,13 @@ export default class Sba641ReportingWizard extends LightningElement {
                 this.isMerging   = false;
                 return;
             }
-            // Open VF page in new tab — full browser navigation, no CORS
             window.open('/apex/SBA641_XMLMerge?uploadId=' + uploadId, '_blank');
             this.isMerging     = false;
             this.mergeComplete = true;
-            this.mergeStatus   = '\u2705 Download page opened in new tab. Follow the instructions there.';
+            this.mergeStatus   = '\u2705 Download page opened in new tab. Follow the instructions there to get your merged XML file.';
         } catch(err) {
             this.isMerging   = false;
-            this.mergeStatus = 'Error: ' + (err.message || String(err));
+            this.mergeStatus = 'Error: ' + (err.body ? err.body.message : err.message || String(err));
         }
     }
 
