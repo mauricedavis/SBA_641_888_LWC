@@ -1,78 +1,190 @@
 <template>
-    <lightning-card title="SBA 888 Training Report" icon-name="standard:report">
-        <div class="slds-p-around_medium">
+    <lightning-card title="SBA 888 Training Report" icon-name="standard:event">
 
-            <c-nexus-report-validation-panel
-                if:true={showValidationPanel}
-                validation-results={validationResults}
-                error-count={errorCount}
-                warning-count={warningCount}>
-            </c-nexus-report-validation-panel>
+        <!-- Validation panel (shown from step 3 onwards if any results) -->
+        <template if:true={showValidationPanel}>
+            <div class="slds-m-horizontal_medium slds-m-bottom_small">
+                <c-nexus-report-validation-panel
+                    validation-results={validationResults}
+                    error-count={errorCount}
+                    warning-count={warningCount}>
+                </c-nexus-report-validation-panel>
+            </div>
+        </template>
 
-            <lightning-progress-indicator current-step={currentStepStr} type="path">
-                <lightning-progress-step label="Select Period" value="1"></lightning-progress-step>
-                <lightning-progress-step label="Validate"      value="2"></lightning-progress-step>
-                <lightning-progress-step label="Review"        value="3"></lightning-progress-step>
-                <lightning-progress-step label="Generating"    value="4"></lightning-progress-step>
+        <!-- Global merge status -->
+        <template if:true={isMerging}>
+            <div class="slds-notify slds-notify_alert slds-theme_info slds-m-horizontal_medium slds-m-bottom_small" role="status">
+                <lightning-spinner alternative-text="Merging..." size="x-small" class="slds-m-right_x-small"></lightning-spinner>
+                {mergeStatus}
+            </div>
+        </template>
+        <template if:true={mergeComplete}>
+            <div class="slds-notify slds-notify_alert slds-theme_success slds-m-horizontal_medium slds-m-bottom_small" role="status">
+                <lightning-icon icon-name="utility:success" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                {mergeStatus}
+            </div>
+        </template>
+
+        <div class="slds-m-around_medium">
+
+            <!-- Progress bar -->
+            <lightning-progress-indicator current-step={currentStepStr} type="path" has-error="false">
+                <lightning-progress-step label="Select Quarter" value="1"></lightning-progress-step>
+                <lightning-progress-step label="Extract Events" value="2"></lightning-progress-step>
+                <lightning-progress-step label="Review" value="3"></lightning-progress-step>
+                <lightning-progress-step label="Generate XML" value="4"></lightning-progress-step>
             </lightning-progress-indicator>
 
             <div class="slds-m-top_medium">
 
+                <!-- Step 1: Select Quarter -->
                 <template if:true={isStep1}>
-                    <div class="slds-grid slds-gutters slds-wrap">
+                    <p class="slds-text-heading_small slds-m-bottom_small">Select the quarter to report:</p>
+                    <div class="slds-grid slds-gutters slds-m-bottom_small">
                         <div class="slds-col slds-size_1-of-2">
                             <lightning-combobox label="Quarter" value={selectedQuarter}
-                                options={quarterOptions} onchange={handleQuarterChange} required>
+                                options={quarterOptions} onchange={handleQuarterChange}>
                             </lightning-combobox>
                         </div>
                         <div class="slds-col slds-size_1-of-2">
                             <lightning-combobox label="Year" value={selectedYear}
-                                options={yearOptions} onchange={handleYearChange} required>
+                                options={yearOptions} onchange={handleYearChange}>
                             </lightning-combobox>
                         </div>
                     </div>
-                    <div class="slds-m-top_medium">
-                        <lightning-button label="Validate Data →" variant="brand"
-                            onclick={handleValidate} disabled={isValidateDisabled}>
-                        </lightning-button>
-                    </div>
-                </template>
-
-                <template if:true={isStep2}>
-                    <template if:true={isValidating}>
-                        <lightning-spinner alternative-text="Validating..." size="medium"></lightning-spinner>
+                    <template if:true={dateLabel}>
+                        <p class="slds-text-color_weak slds-m-bottom_small">{dateLabel}</p>
                     </template>
-                    <template if:false={isValidating}>
-                        <p><strong>{totalRecords}</strong> records for <strong>{quarterYear}</strong></p>
-                        <div class="slds-grid slds-gutters slds-m-top_small">
-                            <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
-                            <div class="slds-col slds-text-align_right">
-                                <lightning-button label="Review →" variant="brand"
-                                    onclick={handleProceedToReview} disabled={hasErrors}>
+
+                    <!-- XML parts already exist -->
+                    <template if:true={existingPartCount}>
+                        <div class="slds-notify slds-notify_alert slds-theme_success slds-m-top_small" role="alert">
+                            <lightning-icon icon-name="utility:file" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                            XML report already generated for <strong>{quarterYear}</strong> ({existingPartCount} part file(s) ready).
+                            <div class="slds-m-top_x-small">
+                                <lightning-button label="&#x2B07; Download &amp; Merge XML" variant="brand"
+                                    icon-name="utility:download" onclick={handleDownloadAndMerge}
+                                    class="slds-m-right_x-small">
+                                </lightning-button>
+                                <lightning-button label="Re-Generate XML" variant="neutral"
+                                    onclick={handleReGenerate}>
                                 </lightning-button>
                             </div>
                         </div>
                     </template>
+
+                    <!-- Existing records detected -->
+                    <template if:true={existingRecordCount}>
+                        <template if:false={existingPartCount}>
+                            <div class="slds-notify slds-notify_alert slds-theme_info slds-m-top_small" role="alert">
+                                <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                                {existingRecordCount} records already extracted for <strong>{quarterYear}</strong>.
+                                <div class="slds-m-top_x-small">
+                                    <lightning-button label="Go to Review &#x2192;" variant="brand"
+                                        onclick={handleSkipToReview} class="slds-m-right_x-small">
+                                    </lightning-button>
+                                    <lightning-button label="Re-Extract" variant="neutral"
+                                        onclick={handleExtract}>
+                                    </lightning-button>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+
+                    <template if:false={existingRecordCount}>
+                        <div class="slds-m-top_medium">
+                            <lightning-button label="Extract Events &#x2192;" variant="brand"
+                                onclick={handleExtract} disabled={isNextDisabled}>
+                            </lightning-button>
+                        </div>
+                    </template>
                 </template>
 
+                <!-- Step 2: Extract Events -->
+                <template if:true={isStep2}>
+                    <p class="slds-m-bottom_small">Extracting 888 events for <strong>{quarterYear}</strong>&#x2026;</p>
+                    <c-nexus-report-progress-tracker
+                        job-id={extractJobId}
+                        onjobcomplete={handleExtractComplete}>
+                    </c-nexus-report-progress-tracker>
+                </template>
+
+                <!-- Step 3: Review -->
                 <template if:true={isStep3}>
                     <div class="slds-box slds-m-bottom_medium">
                         <p><strong>Quarter:</strong> {quarterYear}</p>
-                        <p><strong>Records:</strong> {totalRecords}</p>
+                        <p><strong>Session date range:</strong> {dateLabel}</p>
+                        <p><strong>Events extracted:</strong> {extractedCount}</p>
                     </div>
+                    <template if:true={noRecordsExtracted}>
+                        <div class="slds-notify slds-notify_alert slds-theme_warning" role="alert">
+                            No events were found for {quarterYear}. Please verify the date range and event data.
+                        </div>
+                    </template>
+
+                    <!-- XML parts already exist -->
+                    <template if:true={existingPartCount}>
+                        <div class="slds-notify slds-notify_alert slds-theme_success slds-m-bottom_small" role="alert">
+                            <lightning-icon icon-name="utility:file" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                            XML already generated for <strong>{quarterYear}</strong> ({existingPartCount} part file(s) ready).
+                        </div>
+                    </template>
+
                     <div class="slds-grid slds-gutters">
-                        <div class="slds-col"><lightning-button label="← Back" onclick={handleBack}></lightning-button></div>
+                        <div class="slds-col">
+                            <lightning-button label="&#x2190; Back" onclick={handleBack}></lightning-button>
+                        </div>
                         <div class="slds-col slds-text-align_right">
-                            <lightning-button label="Generate XML" variant="brand" onclick={handleGenerate}></lightning-button>
+                            <template if:true={existingPartCount}>
+                                <lightning-button label="&#x2B07; Download &amp; Merge XML" variant="brand"
+                                    icon-name="utility:download" onclick={handleDownloadAndMerge}
+                                    class="slds-m-right_x-small">
+                                </lightning-button>
+                            </template>
+                            <lightning-button label="Generate XML" variant={generateButtonVariant}
+                                onclick={handleGenerate} disabled={noRecordsExtracted}>
+                            </lightning-button>
                         </div>
                     </div>
                 </template>
 
+                <!-- Step 4: Generate XML -->
                 <template if:true={isStep4}>
-                    <c-nexus-report-progress-tracker job-id={jobId} onjobcomplete={handleJobComplete}>
-                    </c-nexus-report-progress-tracker>
+                    <template if:false={xmlComplete}>
+                        <p class="slds-m-bottom_small">Generating 888 XML for <strong>{quarterYear}</strong>&#x2026;</p>
+                        <c-nexus-report-progress-tracker
+                            job-id={xmlJobId}
+                            onjobcomplete={handleJobComplete}>
+                        </c-nexus-report-progress-tracker>
+                    </template>
+                    <template if:true={xmlComplete}>
+                        <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                            <p class="slds-text-heading_small">
+                                <lightning-icon icon-name="utility:success" size="small" variant="success" class="slds-m-right_x-small"></lightning-icon>
+                                XML generation complete for <strong>{quarterYear}</strong>
+                            </p>
+                            <p class="slds-text-color_weak slds-text-body_small slds-m-top_x-small">
+                                You will receive an email when the file is ready. Click below to download.
+                            </p>
+                        </div>
+                        <lightning-button
+                            if:true={showDownloadButton}
+                            label="&#x2B07; Download &amp; Merge XML"
+                            variant="brand"
+                            icon-name="utility:download"
+                            onclick={handleDownloadAndMerge}>
+                        </lightning-button>
+                    </template>
                 </template>
 
+            </div>
+
+            <!-- Start Over -->
+            <div class="slds-m-top_medium">
+                <lightning-button label="&#x21ba; Start Over" variant="neutral"
+                    onclick={handleStartOver} if:false={isStep1}>
+                </lightning-button>
             </div>
         </div>
     </lightning-card>

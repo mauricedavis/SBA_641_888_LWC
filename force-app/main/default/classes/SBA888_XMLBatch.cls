@@ -1,218 +1,333 @@
 /**
- * SBA888_XMLBatch — ORIGINAL (source-tracked from sandbox)
+ * SBA888_XMLBatch
+ * Generates SBA Form 888 (Management Training) XML from SBA_888_Output__c records.
+ * Uses chunked ContentVersion approach — one ContentVersion per execute() call.
+ * Enqueues SBA888_XMLAssembler on finish() to assemble parts into final file.
  *
- * CRITICAL BUGS (see SBA888_XMLBatch_REFACTORED for fixes):
- *
- * BUG-1 [P0 — CRITICAL] XML root tag emitted in execute()
- *   Every batch chunk emits <?xml ...?> and <ManagementTrainingReport>.
- *   Any quarter with >200 events produces multiple root tags → XML is unparseable.
- *   Fix: emit root in start() only; close in finish() only.
- *
- * BUG-2 [P0 — CRITICAL] No Quarter_Year__c filter
- *   start() query has NO WHERE clause → every run includes ALL SBA_888_Output__c
- *   records from every quarter ever loaded.
- *   Fix: WHERE Quarter_Year__c = :varQuarterYear
- *
- * BUG-3 [P2] <ProgramFormat> missing
- *   Sample XML requires both <ProgramFormat> (raw) and <ProgramFormatType> (normalized).
- *   Batch only emits <ProgramFormatType>.
- *
- * BUG-4 [P2] <CosponsorsName> tag name mismatch
- *   Batch emits <CoSponsors> but XSD element is <CosponsorsName>.
- *   Similarly emits <Sponsor> instead of <SponsorName>.
+ * XSD: SBA_NEXUS_Training-2-14.xsd
+ * Root: <ManagementTrainingReport>
+ * Record: <ManagementTrainingRecord>
  */
-public with sharing class SBA888_XMLBatch implements Database.Batchable<SObject>, Database.Stateful {
+public class SBA888_XMLBatch implements Database.Batchable<SObject>, Database.Stateful {
 
     private String varQuarterYear;
-    private String varReportType;
-    private String xmlOutput = '';
-    private String jobOwnerEmail = '';
+    private String ownerEmail     = '';
+    private Integer chunkIndex    = 0;
+    private List<Id> chunkCVIds   = new List<Id>();
 
-    public SBA888_XMLBatch(String varQuarterYear, String varReportType) {
+    public SBA888_XMLBatch(String varQuarterYear) {
         this.varQuarterYear = varQuarterYear;
-        this.varReportType  = varReportType;
     }
 
-    public static String escapeXml(String input) {
-        if (input == null) return '';
-        input = input.replaceAll('&', '&amp;');
-        input = input.replaceAll('<', '&lt;');
-        input = input.replaceAll('>', '&gt;');
-        input = input.replaceAll('"', '&quot;');
-        input = input.replaceAll('\'', '&apos;');
-        return input;
-    }
-
-    public static String getStateFullName(String stateAbbreviation) {
-        Map<String, String> stateMap = new Map<String, String>{
-            'AL' => 'Alabama', 'AK' => 'Alaska', 'AZ' => 'Arizona', 'AR' => 'Arkansas', 'CA' => 'California',
-            'CO' => 'Colorado', 'CT' => 'Connecticut', 'DE' => 'Delaware', 'FL' => 'Florida', 'GA' => 'Georgia',
-            'HI' => 'Hawaii', 'ID' => 'Idaho', 'IL' => 'Illinois', 'IN' => 'Indiana', 'IA' => 'Iowa', 'KS' => 'Kansas',
-            'KY' => 'Kentucky', 'LA' => 'Louisiana', 'ME' => 'Maine', 'MD' => 'Maryland', 'MA' => 'Massachusetts',
-            'MI' => 'Michigan', 'MN' => 'Minnesota', 'MS' => 'Mississippi', 'MO' => 'Missouri', 'MT' => 'Montana',
-            'NE' => 'Nebraska', 'NV' => 'Nevada', 'NH' => 'New Hampshire', 'NJ' => 'New Jersey', 'NM' => 'New Mexico',
-            'NY' => 'New York', 'NC' => 'North Carolina', 'ND' => 'North Dakota', 'OH' => 'Ohio', 'OK' => 'Oklahoma',
-            'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'RI' => 'Rhode Island', 'SC' => 'South Carolina',
-            'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas', 'UT' => 'Utah', 'VT' => 'Vermont',
-            'VA' => 'Virginia', 'WA' => 'Washington', 'WV' => 'West Virginia', 'WI' => 'Wisconsin', 'WY' => 'Wyoming'
-        };
-        return stateMap.containsKey(stateAbbreviation) ? stateMap.get(stateAbbreviation) : stateAbbreviation;
-    }
-
-    // BUG-2: NO WHERE CLAUSE — returns ALL SBA_888_Output__c records from all quarters
     public Database.QueryLocator start(Database.BatchableContext bc) {
-        String query = 'SELECT PartnerTrainingNumber__c, LocationCode__c, DateTrainingStarted__c, ' +
-                       'TotalTrainingHours__c, TrainingTitle__c, City_TrainingLocation__c, State_TrainingLocation__c, ' +
-                       'ZipCode_TrainingLocation__c, Country_TrainingLocation__c, Total_NumberTrained__c, ' +
-                       'CurrentlyInBusiness_NumberTrained__c, NotYetInBusiness_NumberTrained__c, ' +
-                       'PersonWithDisabilities_NumberTrained__c, Female_NumberTrained__c, ' +
-                       'Veterans_NumberTrained__c, TrainingTopic__c, ' +
-                       'LGBTQ_NumberTrained__c, ActiveDuty_NumberTrained__c, Asian_NumberTrained__c, ' +
-                       'BlackOrAfricanAmerican_NumberTrained__c, DollarAmountOfFees__c, ' +
-                       'FundingSource__c, HispanicOrLatinoOrigin_NumberTrained__c, Language_Code__c, ' +
-                       'MemberOfReserveOrNationalGuard_NumberTra__c, MiddleEastern_NumberTrained__c, ' +
-                       'NativeAmericanOrAlaskaNative_NumberTrain__c, NativeHawaiinOrPacificIslander_NumberTra__c, ' +
-                       'NonHispanicOrLatinoOrigin_NumberTrained__c, NorthAfrican_NumberTrained__c, NumberOfSessions__c, ' +
-                       'PostalCode_TrainingLocation__c, ProgramFormatType__c, ServiceDisabledVeterans_NumberTrained__c, ' +
-                       'SpouseOfMilitaryMember_NumberTrained__c, Total_NumberMinoritiesTrained__c, SponsorName__c, ' +
-                       'CoSponsorsName__c, TrainingPartners_Code_SBA__c, TrainingPartners_OtherAgency_OtherGovtAg__c, ' +
-                       'TrainingPartners_Code_ChamberOfCommerce__c, TrainingPartners_Code_Educational_Inst__c, ' +
-                       'TrainingPartners_Code_For_Profit_Org__c, TrainingPartners_Code_Native_American_Ct__c, ' +
-                       'TrainingPartners_Code_Online_Training__c, TrainingPartners_Code_SBDC__c, ' +
-                       'TrainingPartners_Code_SCORE__c, TrainingPartners_Code_TradeOrProfessiona__c, ' +
-                       'TrainingPartners_Code_VBOC__c, TrainingPartners_Code_Women_sBusinessCtr__c, ' +
-                       'TrainingPartners_Other_OtherResources__c, TrainingPartners_OtherSBA_District_Offic__c, ' +
-                       'White_NumberTrained__c, StateOrProvince_TrainingLocation__c ' +
-                       'FROM SBA_888_Output__c '; // BUG-2: no WHERE clause
+        ownerEmail = [SELECT Email FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1].Email;
 
-        return Database.getQueryLocator(query);
+        // Write XML header as chunk 0
+        ContentVersion cv0 = new ContentVersion();
+        cv0.Title          = 'SBA888_XML_Chunk_' + varQuarterYear + '_000';
+        cv0.PathOnClient   = cv0.Title + '.txt';
+        cv0.VersionData    = Blob.valueOf('<?xml version="1.0" encoding="UTF-8"?>\n<ManagementTrainingReport>\n');
+        cv0.IsMajorVersion = false;
+        insert cv0;
+        chunkCVIds.add(cv0.Id);
+        chunkIndex = 1;
+
+        return Database.getQueryLocator(
+            'SELECT Id, PartnerTrainingNumber__c, FundingSource__c, LocationCode__c,' +
+            ' DateTrainingStarted__c, NumberOfSessions__c, TotalTrainingHours__c,' +
+            ' TrainingTitle__c,' +
+            ' City_TrainingLocation__c, State_TrainingLocation__c,' +
+            ' ZipCode_TrainingLocation__c, PostalCode_TrainingLocation__c,' +
+            ' StateOrProvince_TrainingLocation__c, Country_TrainingLocation__c,' +
+            ' Total_NumberTrained__c,' +
+            ' CurrentlyInBusiness_NumberTrained__c, NotYetInBusiness_NumberTrained__c,' +
+            ' PersonWithDisabilities_NumberTrained__c, Female_NumberTrained__c,' +
+            ' ActiveDuty_NumberTrained__c, Veterans_NumberTrained__c,' +
+            ' ServiceDisabledVeterans_NumberTrained__c,' +
+            ' MemberOfReserveOrNationalGuard_NumberTra__c,' +
+            ' SpouseOfMilitaryMember_NumberTrained__c,' +
+            ' Asian_NumberTrained__c, BlackOrAfricanAmerican_NumberTrained__c,' +
+            ' NativeAmericanOrAlaskaNative_NumberTrain__c,' +
+            ' NativeHawaiinOrPacificIslander_NumberTra__c,' +
+            ' White_NumberTrained__c, MiddleEastern_NumberTrained__c,' +
+            ' NorthAfrican_NumberTrained__c,' +
+            ' HispanicOrLatinoOrigin_NumberTrained__c,' +
+            ' NonHispanicOrLatinoOrigin_NumberTrained__c,' +
+            ' Total_NumberMinoritiesTrained__c,' +
+            ' TrainingTopic__c, Language_Code__c, ProgramFormatType__c,' +
+            ' DollarAmountOfFees__c,' +
+            ' TrainingPartners_Code_ChamberOfCommerce__c,' +
+            ' TrainingPartners_Code_Educational_Inst__c,' +
+            ' TrainingPartners_Code_For_Profit_Org__c,' +
+            ' TrainingPartners_Code_Native_American_Ct__c,' +
+            ' TrainingPartners_Code_Online_Training__c,' +
+            ' TrainingPartners_Code_SBA__c,' +
+            ' TrainingPartners_Code_SBDC__c,' +
+            ' TrainingPartners_Code_SCORE__c,' +
+            ' TrainingPartners_Code_TradeOrProfessiona__c,' +
+            ' TrainingPartners_Code_VBOC__c,' +
+            ' TrainingPartners_Code_Women_sBusinessCtr__c,' +
+            ' TrainingPartners_OtherSBA_District_Offic__c,' +
+            ' TrainingPartners_OtherAgency_OtherGovtAg__c,' +
+            ' TrainingPartners_Other_OtherResources__c,' +
+            ' SponsorName__c, CoSponsorsName__c' +
+            ' FROM SBA_888_Output__c' +
+            ' WHERE RecordType.DeveloperName = \'' + varQuarterYear + '\'' +
+            ' ORDER BY PartnerTrainingNumber__c ASC'
+        );
     }
 
-    // BUG-1: XML root tag emitted on every execute() call
     public void execute(Database.BatchableContext bc, List<SBA_888_Output__c> scope) {
-        xmlOutput += '<?xml version="1.0" encoding="UTF-8"?>\n';        // BUG-1
-        xmlOutput += '<ManagementTrainingReport xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n'; // BUG-1
+        List<String> chunk = new List<String>();
 
-        for (SBA_888_Output__c record : scope) {
-            xmlOutput += '<ManagementTrainingRecord>\n';
-            if (record.PartnerTrainingNumber__c != null) xmlOutput += '<PartnerTrainingNumber>' + escapeXml(record.PartnerTrainingNumber__c) + '</PartnerTrainingNumber>\n';
-            if (record.LocationCode__c != null) xmlOutput += '<Location><LocationCode>' + escapeXml(record.LocationCode__c) + '</LocationCode></Location>\n';
-            if (record.FundingSource__c != null) xmlOutput += '<FundingSource>' + escapeXml(record.FundingSource__c) + '</FundingSource>\n';
-            if (record.DateTrainingStarted__c != null) xmlOutput += '<DateTrainingStarted>' + String.valueOf(record.DateTrainingStarted__c) + '</DateTrainingStarted>\n';
-            if (record.NumberOfSessions__c != null) xmlOutput += '<NumberOfSessions>' + String.valueOf(record.NumberOfSessions__c) + '</NumberOfSessions>\n';
-            if (record.TotalTrainingHours__c != null) xmlOutput += '<TotalTrainingHours>' + String.valueOf(record.TotalTrainingHours__c) + '</TotalTrainingHours>\n';
-            if (record.TrainingTitle__c != null) xmlOutput += '<TrainingTitle>' + escapeXml(record.TrainingTitle__c) + '</TrainingTitle>\n';
+        for (SBA_888_Output__c r : scope) {
+            chunk.add('<ManagementTrainingRecord>\n');
+            chunk.add('<Operation></Operation>\n');
+            chunk.add(xt('PartnerTrainingNumber', r.PartnerTrainingNumber__c));
 
-            xmlOutput += '<TrainingLocation>\n';
-            if (record.City_TrainingLocation__c != null) xmlOutput += '<City>' + escapeXml(record.City_TrainingLocation__c) + '</City>\n';
-            if (record.State_TrainingLocation__c != null) xmlOutput += '<State>' + escapeXml(record.State_TrainingLocation__c) + '</State>\n';
-            if (record.ZipCode_TrainingLocation__c != null) xmlOutput += '<ZipCode>' + escapeXml(record.ZipCode_TrainingLocation__c) + '</ZipCode>\n';
-            if (record.Country_TrainingLocation__c != null) xmlOutput += '<Country><Code>' + escapeXml(record.Country_TrainingLocation__c) + '</Code></Country>\n';
-            xmlOutput += '</TrainingLocation>\n';
-
-            xmlOutput += '<NumberTrained>\n';
-            if (record.Total_NumberTrained__c != null) xmlOutput += '<Total>' + String.valueOf(record.Total_NumberTrained__c) + '</Total>\n';
-            if (record.CurrentlyInBusiness_NumberTrained__c != null) xmlOutput += '<CurrentlyInBusiness>' + String.valueOf(record.CurrentlyInBusiness_NumberTrained__c) + '</CurrentlyInBusiness>\n';
-            if (record.NotYetInBusiness_NumberTrained__c != null) xmlOutput += '<NotYetInBusiness>' + String.valueOf(record.NotYetInBusiness_NumberTrained__c) + '</NotYetInBusiness>\n';
-            if (record.PersonWithDisabilities_NumberTrained__c != null) xmlOutput += '<PersonWithDisabilities>' + String.valueOf(record.PersonWithDisabilities_NumberTrained__c) + '</PersonWithDisabilities>\n';
-            if (record.Female_NumberTrained__c != null) xmlOutput += '<Female>' + String.valueOf(record.Female_NumberTrained__c) + '</Female>\n';
-            if (record.ActiveDuty_NumberTrained__c != null) xmlOutput += '<ActiveDuty>' + String.valueOf(record.ActiveDuty_NumberTrained__c) + '</ActiveDuty>\n';
-            if (record.Veterans_NumberTrained__c != null) xmlOutput += '<Veterans>' + String.valueOf(record.Veterans_NumberTrained__c) + '</Veterans>\n';
-            if (record.ServiceDisabledVeterans_NumberTrained__c != null) xmlOutput += '<ServiceDisabledVeterans>' + String.valueOf(record.ServiceDisabledVeterans_NumberTrained__c) + '</ServiceDisabledVeterans>\n';
-            if (record.MemberOfReserveOrNationalGuard_NumberTra__c != null) xmlOutput += '<MemberOfReserveOrNationalGuard>' + String.valueOf(record.MemberOfReserveOrNationalGuard_NumberTra__c) + '</MemberOfReserveOrNationalGuard>\n';
-            if (record.SpouseOfMilitaryMember_NumberTrained__c != null) xmlOutput += '<SpouseOfMilitaryMember>' + String.valueOf(record.SpouseOfMilitaryMember_NumberTrained__c) + '</SpouseOfMilitaryMember>\n';
-            xmlOutput += '<Race>\n';
-            if (record.Asian_NumberTrained__c != null) xmlOutput += '<Asian>' + String.valueOf(record.Asian_NumberTrained__c) + '</Asian>\n';
-            if (record.BlackOrAfricanAmerican_NumberTrained__c != null) xmlOutput += '<BlackOrAfricanAmerican>' + String.valueOf(record.BlackOrAfricanAmerican_NumberTrained__c) + '</BlackOrAfricanAmerican>\n';
-            if (record.NativeAmericanOrAlaskaNative_NumberTrain__c != null) xmlOutput += '<NativeAmericanOrAlaskaNative>' + String.valueOf(record.NativeAmericanOrAlaskaNative_NumberTrain__c) + '</NativeAmericanOrAlaskaNative>\n';
-            if (record.NativeHawaiinOrPacificIslander_NumberTra__c != null) xmlOutput += '<NativeHawaiianOrPacificIslander>' + String.valueOf(record.NativeHawaiinOrPacificIslander_NumberTra__c) + '</NativeHawaiianOrPacificIslander>\n';
-            if (record.White_NumberTrained__c != null) xmlOutput += '<White>' + String.valueOf(record.White_NumberTrained__c) + '</White>\n';
-            if (record.MiddleEastern_NumberTrained__c != null) xmlOutput += '<MiddleEastern>' + String.valueOf(record.MiddleEastern_NumberTrained__c) + '</MiddleEastern>\n';
-            if (record.NorthAfrican_NumberTrained__c != null) xmlOutput += '<NorthAfrican>' + String.valueOf(record.NorthAfrican_NumberTrained__c) + '</NorthAfrican>\n';
-            xmlOutput += '</Race>\n';
-            xmlOutput += '<Ethnicity>\n';
-            if (record.HispanicOrLatinoOrigin_NumberTrained__c != null) xmlOutput += '<HispanicOrLatinoOrigin>' + String.valueOf(record.HispanicOrLatinoOrigin_NumberTrained__c) + '</HispanicOrLatinoOrigin>\n';
-            if (record.NonHispanicOrLatinoOrigin_NumberTrained__c != null) xmlOutput += '<NonHispanicOrLatinoOrigin>' + String.valueOf(record.NonHispanicOrLatinoOrigin_NumberTrained__c) + '</NonHispanicOrLatinoOrigin>\n';
-            xmlOutput += '</Ethnicity>\n';
-            if (record.LGBTQ_NumberTrained__c != null) xmlOutput += '<LGBTQ>' + String.valueOf(record.LGBTQ_NumberTrained__c) + '</LGBTQ>\n';
-            xmlOutput += '</NumberTrained>\n';
-
-            if (record.Total_NumberMinoritiesTrained__c != null) {
-                xmlOutput += '<NumberMinoritiesTrained>\n';
-                xmlOutput += '<Total>' + String.valueOf(record.Total_NumberMinoritiesTrained__c) + '</Total>\n';
-                xmlOutput += '</NumberMinoritiesTrained>\n';
-            }
-            if (record.TrainingTopic__c != null) {
-                xmlOutput += '<TrainingTopic>\n';
-                xmlOutput += '<Code>' + escapeXml(record.TrainingTopic__c) + '</Code>\n';
-                xmlOutput += '</TrainingTopic>\n';
+            if (String.isNotBlank(r.FundingSource__c)) {
+                chunk.add(xt('FundingSource', r.FundingSource__c));
             }
 
-            xmlOutput += '<TrainingPartners>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_SBA__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_SBA__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_ChamberOfCommerce__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_ChamberOfCommerce__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_Educational_Inst__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_Educational_Inst__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_For_Profit_Org__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_For_Profit_Org__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_Native_American_Ct__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_Native_American_Ct__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_Online_Training__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_Online_Training__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_SBDC__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_SBDC__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_SCORE__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_SCORE__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_TradeOrProfessiona__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_TradeOrProfessiona__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_VBOC__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_VBOC__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_Code_Women_sBusinessCtr__c)) xmlOutput += '<Code>' + escapeXml(record.TrainingPartners_Code_Women_sBusinessCtr__c) + '</Code>\n';
-            if (!String.isBlank(record.TrainingPartners_OtherAgency_OtherGovtAg__c)) xmlOutput += '<Other>' + escapeXml(record.TrainingPartners_OtherAgency_OtherGovtAg__c) + '</Other>\n';
-            if (!String.isBlank(record.TrainingPartners_Other_OtherResources__c)) xmlOutput += '<Other>' + escapeXml(record.TrainingPartners_Other_OtherResources__c) + '</Other>\n';
-            if (!String.isBlank(record.TrainingPartners_OtherSBA_District_Offic__c)) xmlOutput += '<Other>' + escapeXml(record.TrainingPartners_OtherSBA_District_Offic__c) + '</Other>\n';
-            xmlOutput += '</TrainingPartners>\n';
+            chunk.add('<Location>' + xt('LocationCode', r.LocationCode__c) + '</Location>\n');
 
-            // BUG-3: only <ProgramFormatType>, missing <ProgramFormat>
-            if (record.ProgramFormatType__c != null) xmlOutput += '<ProgramFormatType>' + escapeXml(record.ProgramFormatType__c) + '</ProgramFormatType>\n';
-            if (record.DollarAmountOfFees__c != null) xmlOutput += '<DollarAmountOfFees>' + String.valueOf(record.DollarAmountOfFees__c) + '</DollarAmountOfFees>\n';
-            if (record.Language_Code__c != null) xmlOutput += '<Language><Code>' + escapeXml(record.Language_Code__c) + '</Code></Language>\n';
-            // BUG-4: wrong element names (<CoSponsors> vs <CosponsorsName>, <Sponsor> vs <SponsorName>)
-            if (record.CoSponsorsName__c != null) xmlOutput += '<CoSponsors>' + escapeXml(record.CoSponsorsName__c) + '</CoSponsors>\n';
-            if (record.SponsorName__c != null) xmlOutput += '<Sponsor>' + escapeXml(record.SponsorName__c) + '</Sponsor>\n';
+            if (r.DateTrainingStarted__c != null) {
+                chunk.add(xt('DateTrainingStarted', String.valueOf(r.DateTrainingStarted__c)));
+            }
+            if (r.NumberOfSessions__c != null) {
+                chunk.add(xt('NumberOfSessions', String.valueOf(r.NumberOfSessions__c.intValue())));
+            }
+            if (r.TotalTrainingHours__c != null) {
+                chunk.add(xt('TotalTrainingHours', String.valueOf(r.TotalTrainingHours__c)));
+            }
+            if (String.isNotBlank(r.TrainingTitle__c)) {
+                chunk.add(xt('TrainingTitle', r.TrainingTitle__c));
+            }
 
-            xmlOutput += '</ManagementTrainingRecord>\n';
+            // TrainingLocation
+            Boolean hasLocation = String.isNotBlank(r.City_TrainingLocation__c)
+                || String.isNotBlank(r.State_TrainingLocation__c)
+                || String.isNotBlank(r.ZipCode_TrainingLocation__c)
+                || String.isNotBlank(r.Country_TrainingLocation__c);
+            if (hasLocation) {
+                chunk.add('<TrainingLocation>\n');
+                if (String.isNotBlank(r.City_TrainingLocation__c)) chunk.add(xt('City', r.City_TrainingLocation__c));
+                if (String.isNotBlank(r.State_TrainingLocation__c)) chunk.add(xt('State', r.State_TrainingLocation__c));
+                if (String.isNotBlank(r.ZipCode_TrainingLocation__c)) chunk.add(xt('ZipCode', r.ZipCode_TrainingLocation__c));
+                if (String.isNotBlank(r.PostalCode_TrainingLocation__c)) chunk.add(xt('PostalCode', r.PostalCode_TrainingLocation__c));
+                if (String.isNotBlank(r.StateOrProvince_TrainingLocation__c)) chunk.add(xt('StateOrProvince', r.StateOrProvince_TrainingLocation__c));
+                if (String.isNotBlank(r.Country_TrainingLocation__c)) {
+                    chunk.add('<Country>' + xt('Code', r.Country_TrainingLocation__c) + '</Country>\n');
+                }
+                chunk.add('</TrainingLocation>\n');
+            }
+
+            // NumberTrained
+            if (r.Total_NumberTrained__c != null) {
+                chunk.add('<NumberTrained>\n');
+                chunk.add(xt('Total', String.valueOf(r.Total_NumberTrained__c.intValue())));
+                if (r.CurrentlyInBusiness_NumberTrained__c != null) chunk.add(xt('CurrentlyInBusiness', String.valueOf(r.CurrentlyInBusiness_NumberTrained__c.intValue())));
+                if (r.NotYetInBusiness_NumberTrained__c != null) chunk.add(xt('NotYetInBusiness', String.valueOf(r.NotYetInBusiness_NumberTrained__c.intValue())));
+                if (r.PersonWithDisabilities_NumberTrained__c != null) chunk.add(xt('PersonWithDisabilities', String.valueOf(r.PersonWithDisabilities_NumberTrained__c.intValue())));
+                if (r.Female_NumberTrained__c != null) chunk.add(xt('Female', String.valueOf(r.Female_NumberTrained__c.intValue())));
+                if (r.ActiveDuty_NumberTrained__c != null) chunk.add(xt('ActiveDuty', String.valueOf(r.ActiveDuty_NumberTrained__c.intValue())));
+                if (r.Veterans_NumberTrained__c != null) chunk.add(xt('Veterans', String.valueOf(r.Veterans_NumberTrained__c.intValue())));
+                if (r.ServiceDisabledVeterans_NumberTrained__c != null) chunk.add(xt('ServiceDisabledVeterans', String.valueOf(r.ServiceDisabledVeterans_NumberTrained__c.intValue())));
+                if (r.MemberOfReserveOrNationalGuard_NumberTra__c != null) chunk.add(xt('MemberOfReserveOrNationalGuard', String.valueOf(r.MemberOfReserveOrNationalGuard_NumberTra__c.intValue())));
+                if (r.SpouseOfMilitaryMember_NumberTrained__c != null) chunk.add(xt('SpouseOfMilitaryMember', String.valueOf(r.SpouseOfMilitaryMember_NumberTrained__c.intValue())));
+
+                // Race
+                Boolean hasRace = r.Asian_NumberTrained__c != null || r.BlackOrAfricanAmerican_NumberTrained__c != null
+                    || r.NativeAmericanOrAlaskaNative_NumberTrain__c != null || r.NativeHawaiinOrPacificIslander_NumberTra__c != null
+                    || r.White_NumberTrained__c != null || r.MiddleEastern_NumberTrained__c != null || r.NorthAfrican_NumberTrained__c != null;
+                if (hasRace) {
+                    chunk.add('<Race>\n');
+                    if (r.Asian_NumberTrained__c != null) chunk.add(xt('Asian', String.valueOf(r.Asian_NumberTrained__c.intValue())));
+                    if (r.BlackOrAfricanAmerican_NumberTrained__c != null) chunk.add(xt('BlackOrAfricanAmerican', String.valueOf(r.BlackOrAfricanAmerican_NumberTrained__c.intValue())));
+                    if (r.NativeAmericanOrAlaskaNative_NumberTrain__c != null) chunk.add(xt('NativeAmericanOrAlaskaNative', String.valueOf(r.NativeAmericanOrAlaskaNative_NumberTrain__c.intValue())));
+                    if (r.NativeHawaiinOrPacificIslander_NumberTra__c != null) chunk.add(xt('NativeHawaiianOrPacificIslander', String.valueOf(r.NativeHawaiinOrPacificIslander_NumberTra__c.intValue())));
+                    if (r.White_NumberTrained__c != null) chunk.add(xt('White', String.valueOf(r.White_NumberTrained__c.intValue())));
+                    if (r.MiddleEastern_NumberTrained__c != null) chunk.add(xt('MiddleEastern', String.valueOf(r.MiddleEastern_NumberTrained__c.intValue())));
+                    if (r.NorthAfrican_NumberTrained__c != null) chunk.add(xt('NorthAfrican', String.valueOf(r.NorthAfrican_NumberTrained__c.intValue())));
+                    chunk.add('</Race>\n');
+                }
+
+                // Ethnicity
+                Boolean hasEthnicity = r.HispanicOrLatinoOrigin_NumberTrained__c != null || r.NonHispanicOrLatinoOrigin_NumberTrained__c != null;
+                if (hasEthnicity) {
+                    chunk.add('<Ethnicity>\n');
+                    if (r.HispanicOrLatinoOrigin_NumberTrained__c != null) chunk.add(xt('HispanicOrLatinoOrigin', String.valueOf(r.HispanicOrLatinoOrigin_NumberTrained__c.intValue())));
+                    if (r.NonHispanicOrLatinoOrigin_NumberTrained__c != null) chunk.add(xt('NonHispanicOrLatinoOrigin', String.valueOf(r.NonHispanicOrLatinoOrigin_NumberTrained__c.intValue())));
+                    chunk.add('</Ethnicity>\n');
+                }
+                chunk.add('</NumberTrained>\n');
+            }
+
+            // NumberUnderservedTrained
+            if (r.Total_NumberMinoritiesTrained__c != null) {
+                chunk.add('<NumberUnderservedTrained>\n');
+                chunk.add(xt('Total', String.valueOf(r.Total_NumberMinoritiesTrained__c.intValue())));
+                chunk.add('</NumberUnderservedTrained>\n');
+            }
+
+            // TrainingTopic
+            if (String.isNotBlank(r.TrainingTopic__c)) {
+                chunk.add('<TrainingTopic>\n');
+                String topic = r.TrainingTopic__c;
+                // Map to valid XSD enum values
+                String mappedTopic = mapTopic(topic);
+                if (mappedTopic == 'Other') {
+                    chunk.add(xt('Code', 'Other'));
+                    chunk.add(xt('Other', topic));
+                } else {
+                    chunk.add(xt('Code', mappedTopic));
+                }
+                chunk.add('</TrainingTopic>\n');
+            }
+
+            // TrainingPartners — one <Code> per partner
+            List<String> partnerCodes = buildPartnerCodes(r);
+            if (!partnerCodes.isEmpty()) {
+                chunk.add('<TrainingPartners>\n');
+                for (String code : partnerCodes) {
+                    chunk.add(xt('Code', code));
+                }
+                if (String.isNotBlank(r.TrainingPartners_OtherSBA_District_Offic__c)) {
+                    chunk.add(xt('OtherSBA', r.TrainingPartners_OtherSBA_District_Offic__c));
+                }
+                if (String.isNotBlank(r.TrainingPartners_OtherAgency_OtherGovtAg__c)) {
+                    chunk.add(xt('OtherAgency', r.TrainingPartners_OtherAgency_OtherGovtAg__c));
+                }
+                if (String.isNotBlank(r.TrainingPartners_Other_OtherResources__c)) {
+                    chunk.add(xt('Other', r.TrainingPartners_Other_OtherResources__c));
+                }
+                chunk.add('</TrainingPartners>\n');
+            }
+
+            // ProgramFormatType
+            if (String.isNotBlank(r.ProgramFormatType__c)) {
+                chunk.add(xt('ProgramFormatType', r.ProgramFormatType__c));
+            }
+
+            // DollarAmountOfFees
+            if (r.DollarAmountOfFees__c != null) {
+                chunk.add(xt('DollarAmountOfFees', String.valueOf(r.DollarAmountOfFees__c.intValue())));
+            }
+
+            // Language — one <Code> per language
+            if (String.isNotBlank(r.Language_Code__c)) {
+                chunk.add('<Language>\n');
+                for (String lang : r.Language_Code__c.split(';')) {
+                    String trimmed = lang.trim();
+                    if (String.isNotBlank(trimmed)) chunk.add(xt('Code', trimmed));
+                }
+                chunk.add('</Language>\n');
+            }
+
+            if (String.isNotBlank(r.SponsorName__c)) chunk.add(xt('SponsorName', r.SponsorName__c));
+            if (String.isNotBlank(r.CoSponsorsName__c)) chunk.add(xt('CoSponsorsName', r.CoSponsorsName__c));
+
+            chunk.add('</ManagementTrainingRecord>\n');
         }
 
-        // BUG-1: closing root tag also in execute()
-        xmlOutput += '</ManagementTrainingReport>\n';
-
-        if (jobOwnerEmail == '') {
-            jobOwnerEmail = [SELECT Email FROM User WHERE Id = :UserInfo.getUserId()].Email;
+        // Save chunk as ContentVersion
+        if (!chunk.isEmpty()) {
+            String padded = String.valueOf(chunkIndex).leftPad(3, '0');
+            ContentVersion cv = new ContentVersion();
+            cv.Title          = 'SBA888_XML_Chunk_' + varQuarterYear + '_' + padded;
+            cv.PathOnClient   = cv.Title + '.txt';
+            cv.VersionData    = Blob.valueOf(String.join(chunk, ''));
+            cv.IsMajorVersion = false;
+            insert cv;
+            chunkCVIds.add(cv.Id);
+            chunkIndex++;
         }
     }
 
     public void finish(Database.BatchableContext bc) {
-        SBA888_XML_Upload__c xmlRecord = new SBA888_XML_Upload__c();
-        xmlRecord.QuarterYear__c = varQuarterYear;
-        insert xmlRecord;
+        // Add closing tag as final chunk
+        ContentVersion cvClose = new ContentVersion();
+        cvClose.Title          = 'SBA888_XML_Chunk_' + varQuarterYear + '_999_CLOSE';
+        cvClose.PathOnClient   = cvClose.Title + '.txt';
+        cvClose.VersionData    = Blob.valueOf('</ManagementTrainingReport>\n');
+        cvClose.IsMajorVersion = false;
+        insert cvClose;
+        chunkCVIds.add(cvClose.Id);
 
-        ContentVersion contentVersion = new ContentVersion();
-        contentVersion.Title = 'SBA888_XML_Report_' + varQuarterYear;
-        contentVersion.PathOnClient = 'SBA888_Report_' + varQuarterYear + '.xml';
-        contentVersion.VersionData = Blob.valueOf(xmlOutput);
-        contentVersion.IsMajorVersion = true;
-        insert contentVersion;
+        System.enqueueJob(new SBA888_XMLAssembler(chunkCVIds, varQuarterYear, ownerEmail));
+    }
 
-        ContentDocumentLink contentDocumentLink = new ContentDocumentLink();
-        contentDocumentLink.ContentDocumentId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :contentVersion.Id LIMIT 1].ContentDocumentId;
-        contentDocumentLink.LinkedEntityId = xmlRecord.Id;
-        contentDocumentLink.ShareType = 'V';
-        insert contentDocumentLink;
+    // XML tag helper — escapes special chars
+    private static String xt(String tag, String val) {
+        if (String.isBlank(val)) return '';
+        String escaped = val
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace('\'', '&apos;');
+        return '<' + tag + '>' + escaped + '</' + tag + '>\n';
+    }
 
-        if (!String.isBlank(jobOwnerEmail)) {
-            Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
-            email.setToAddresses(new String[] { jobOwnerEmail });
-            email.setSubject('SBA888 XML Report for ' + varQuarterYear);
-            email.setPlainTextBody('Please find the attached SBA888 XML report.');
-            Messaging.EmailFileAttachment attachment = new Messaging.EmailFileAttachment();
-            attachment.setFileName('SBA888_Report.xml');
-            attachment.setBody(Blob.valueOf(xmlOutput));
-            attachment.setContentType('text/xml');
-            email.setFileAttachments(new Messaging.EmailFileAttachment[] { attachment });
-            Messaging.sendEmail(new Messaging.SingleEmailMessage[] { email });
-        }
+    // Map SBA888Batch topic values to valid XSD enum values
+    private static String mapTopic(String topic) {
+        if (topic == null) return 'Other';
+        Map<String, String> topicMap = new Map<String, String>{
+            'Business Accounting/Budget'         => 'Business Accounting/Budget',
+            'Business Financial/Cash Flow'       => 'Business Financial/Cash Flow',
+            'Business Financing/Capital Sources' => 'Business Financing/Capital Sources',
+            'Business Operations/Management'     => 'Business Operations/Management',
+            'Business Plan'                      => 'Business Plan',
+            'Business Start-up/Preplanning'      => 'Business Start-up/Preplanning',
+            'Buy/Sell Business'                  => 'Buy/Sell Business',
+            'Credit Counseling'                  => 'Credit Counseling',
+            'Customer Relations'                 => 'Customer Relations',
+            'Cyber Security/Cyber Awareness'     => 'Cyber Security/Cyber Awareness',
+            'Disaster Planning/Recovery'         => 'Disaster Planning/Recovery',
+            'eCommerce'                          => 'eCommerce',
+            'Franchising'                        => 'Franchising',
+            'Government Contracting'             => 'Government Contracting',
+            'Human Resources/Managing Employees' => 'Human Resources/Managing Employees',
+            'Intellectual Property Training'     => 'Intellectual Property Training',
+            'International Trade'                => 'International Trade',
+            'Legal Issues'                       => 'Legal Issues',
+            'Marketing/Sales'                    => 'Marketing/Sales',
+            'Tax Planning'                       => 'Tax Planning',
+            'Technology'                         => 'Technology',
+            // Legacy mappings from SBA888Batch
+            'Buy/Sell a Business'                => 'Buy/Sell Business',
+            'Cash Flow Management'               => 'Business Financial/Cash Flow',
+            'COVID-19 Finance/Capital'           => 'Business Financing/Capital Sources',
+            'COVID-19 General Support'           => 'Marketing/Sales',
+            'Financing/Capital'                  => 'Business Financial/Cash Flow',
+            'Managing Business'                  => 'Business Operations/Management',
+            'Rural Business Development'         => 'Marketing/Sales',
+            'Start-up Assistance'                => 'Business Start-up/Preplanning',
+            'Women-Owned Business'               => 'Marketing/Sales',
+            'Technology/Computers'               => 'Technology',
+            'Not Set'                            => 'Other',
+            'Unknown/Not Stated'                 => 'Other'
+        };
+        return topicMap.containsKey(topic) ? topicMap.get(topic) : 'Other';
+    }
+
+    // Build list of partner Code values from boolean/text fields
+    private static List<String> buildPartnerCodes(SBA_888_Output__c r) {
+        List<String> codes = new List<String>();
+        if (String.isNotBlank(r.TrainingPartners_Code_ChamberOfCommerce__c)) codes.add('Chamber Of Commerce');
+        if (String.isNotBlank(r.TrainingPartners_Code_Educational_Inst__c)) codes.add('Educational Institution');
+        if (String.isNotBlank(r.TrainingPartners_Code_For_Profit_Org__c)) codes.add('For-Profit Organization');
+        if (String.isNotBlank(r.TrainingPartners_Code_Native_American_Ct__c)) codes.add('Native American Center');
+        if (String.isNotBlank(r.TrainingPartners_Code_Online_Training__c)) codes.add('Online Training Resource');
+        if (String.isNotBlank(r.TrainingPartners_Code_SBA__c)) codes.add('SBA');
+        if (String.isNotBlank(r.TrainingPartners_OtherSBA_District_Offic__c)) codes.add('SBA District Office');
+        if (String.isNotBlank(r.TrainingPartners_Code_SBDC__c)) codes.add('SBDC');
+        if (String.isNotBlank(r.TrainingPartners_Code_SCORE__c)) codes.add('SCORE');
+        if (String.isNotBlank(r.TrainingPartners_Code_TradeOrProfessiona__c)) codes.add('Trade or Professional Association');
+        if (String.isNotBlank(r.TrainingPartners_Code_VBOC__c)) codes.add('VBOC');
+        if (String.isNotBlank(r.TrainingPartners_Code_Women_sBusinessCtr__c)) codes.add('Women\'s Business Center');
+        if (String.isNotBlank(r.TrainingPartners_OtherAgency_OtherGovtAg__c)) codes.add('Other Government Agency');
+        if (String.isNotBlank(r.TrainingPartners_Other_OtherResources__c)) codes.add('Other');
+        return codes;
     }
 }
