@@ -1,17 +1,6 @@
 <template>
     <lightning-card title="SBA 888 Training Report" icon-name="standard:event">
 
-        <!-- Validation panel (shown from step 3 onwards if any results) -->
-        <template if:true={showValidationPanel}>
-            <div class="slds-m-horizontal_medium slds-m-bottom_small">
-                <c-nexus-report-validation-panel
-                    validation-results={validationResults}
-                    error-count={errorCount}
-                    warning-count={warningCount}>
-                </c-nexus-report-validation-panel>
-            </div>
-        </template>
-
         <!-- Global merge status -->
         <template if:true={isMerging}>
             <div class="slds-notify slds-notify_alert slds-theme_info slds-m-horizontal_medium slds-m-bottom_small" role="status">
@@ -26,14 +15,26 @@
             </div>
         </template>
 
+        <!-- Validation panel -->
+        <template if:true={showValidationPanel}>
+            <div class="slds-m-horizontal_medium slds-m-bottom_small">
+                <c-nexus-report-validation-panel
+                    validation-results={validationResults}
+                    error-count={errorCount}
+                    warning-count={warningCount}>
+                </c-nexus-report-validation-panel>
+            </div>
+        </template>
+
         <div class="slds-m-around_medium">
 
             <!-- Progress bar -->
             <lightning-progress-indicator current-step={currentStepStr} type="path" has-error="false">
                 <lightning-progress-step label="Select Quarter" value="1"></lightning-progress-step>
                 <lightning-progress-step label="Extract Events" value="2"></lightning-progress-step>
-                <lightning-progress-step label="Review" value="3"></lightning-progress-step>
-                <lightning-progress-step label="Generate XML" value="4"></lightning-progress-step>
+                <lightning-progress-step label="Validate Data" value="3"></lightning-progress-step>
+                <lightning-progress-step label="Review" value="4"></lightning-progress-step>
+                <lightning-progress-step label="Generate XML" value="5"></lightning-progress-step>
             </lightning-progress-indicator>
 
             <div class="slds-m-top_medium">
@@ -81,8 +82,8 @@
                                 <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
                                 {existingRecordCount} records already extracted for <strong>{quarterYear}</strong>.
                                 <div class="slds-m-top_x-small">
-                                    <lightning-button label="Go to Review &#x2192;" variant="brand"
-                                        onclick={handleSkipToReview} class="slds-m-right_x-small">
+                                    <lightning-button label="Go to Validate &#x2192;" variant="brand"
+                                        onclick={handleSkipToValidate} class="slds-m-right_x-small">
                                     </lightning-button>
                                     <lightning-button label="Re-Extract" variant="neutral"
                                         onclick={handleExtract}>
@@ -110,18 +111,59 @@
                     </c-nexus-report-progress-tracker>
                 </template>
 
-                <!-- Step 3: Review -->
+                <!-- Step 3: Validate Data -->
                 <template if:true={isStep3}>
+                    <template if:true={isValidating}>
+                        <div class="slds-m-bottom_small">
+                            <lightning-spinner alternative-text="Validating..." size="small"></lightning-spinner>
+                            <p class="slds-m-top_small slds-text-color_weak">Validating {extractedCount} records against XSD requirements&#x2026;</p>
+                        </div>
+                    </template>
+                    <template if:false={isValidating}>
+                        <div class="slds-box slds-m-bottom_small">
+                            <p><strong>Records validated:</strong> {extractedCount}</p>
+                            <p><strong>Errors:</strong> {errorCount} &nbsp;|&nbsp; <strong>Warnings:</strong> {warningCount}</p>
+                            <template if:true={hasErrors}>
+                                <p class="slds-text-color_error slds-m-top_x-small">
+                                    &#x26A0; {errorCount} error(s) found — these must be corrected before generating XML.
+                                </p>
+                            </template>
+                            <template if:false={hasErrors}>
+                                <template if:true={hasWarnings}>
+                                    <p class="slds-m-top_x-small" style="color:#ff9a00">
+                                        &#x26A0; {warningCount} warning(s) — will not block XML generation.
+                                    </p>
+                                </template>
+                                <template if:false={hasWarnings}>
+                                    <p class="slds-text-color_success slds-m-top_x-small">&#x2705; All records valid.</p>
+                                </template>
+                            </template>
+                        </div>
+                        <div class="slds-grid slds-gutters">
+                            <div class="slds-col">
+                                <lightning-button label="&#x21ba; Re-Validate" variant="neutral"
+                                    onclick={handleValidate} class="slds-m-right_x-small">
+                                </lightning-button>
+                                <lightning-button label="&#x2190; Back" onclick={handleBack}></lightning-button>
+                            </div>
+                            <div class="slds-col slds-text-align_right">
+                                <lightning-button label="Review &amp; Confirm &#x2192;" variant="brand"
+                                    onclick={handleProceedToReview} disabled={hasErrors}>
+                                </lightning-button>
+                            </div>
+                        </div>
+                    </template>
+                </template>
+
+                <!-- Step 4: Review -->
+                <template if:true={isStep4}>
                     <div class="slds-box slds-m-bottom_medium">
                         <p><strong>Quarter:</strong> {quarterYear}</p>
                         <p><strong>Session date range:</strong> {dateLabel}</p>
                         <p><strong>Events extracted:</strong> {extractedCount}</p>
+                        <p><strong>Records validated:</strong> {extractedCount}</p>
+                        <p>{warningCount} warning(s) &#x2014; will not block XML generation</p>
                     </div>
-                    <template if:true={noRecordsExtracted}>
-                        <div class="slds-notify slds-notify_alert slds-theme_warning" role="alert">
-                            No events were found for {quarterYear}. Please verify the date range and event data.
-                        </div>
-                    </template>
 
                     <!-- XML parts already exist -->
                     <template if:true={existingPartCount}>
@@ -143,14 +185,14 @@
                                 </lightning-button>
                             </template>
                             <lightning-button label="Generate XML" variant={generateButtonVariant}
-                                onclick={handleGenerate} disabled={noRecordsExtracted}>
+                                onclick={handleGenerate}>
                             </lightning-button>
                         </div>
                     </div>
                 </template>
 
-                <!-- Step 4: Generate XML -->
-                <template if:true={isStep4}>
+                <!-- Step 5: Generate XML -->
+                <template if:true={isStep5}>
                     <template if:false={xmlComplete}>
                         <p class="slds-m-bottom_small">Generating 888 XML for <strong>{quarterYear}</strong>&#x2026;</p>
                         <c-nexus-report-progress-tracker

@@ -87,6 +87,29 @@ public with sharing class SBA888ReportController {
         };
     }
 
+    // ── Validate extracted output records against XSD ────────────────────────────
+    @AuraEnabled(cacheable=false)
+    public static Map<String,Object> validateQuarter(String quarterYear) {
+        SBA888ValidationService.ValidationSummary summary =
+            SBA888ValidationService.validate(quarterYear);
+        List<Map<String,Object>> results = new List<Map<String,Object>>();
+        for (SBA888ValidationService.ValidationResult r : summary.results) {
+            results.add(new Map<String,Object>{
+                'recordId'             => r.recordId,
+                'partnerTrainingNumber' => r.partnerTrainingNumber,
+                'severity'             => r.severity,
+                'field'                => r.field,
+                'message'              => r.message
+            });
+        }
+        return new Map<String,Object>{
+            'totalRecords' => summary.totalRecords,
+            'errorCount'   => summary.errorCount,
+            'warningCount' => summary.warningCount,
+            'results'      => results
+        };
+    }
+
     // ── Generate XML ───────────────────────────────────────────────────────────
     @AuraEnabled(cacheable=false)
     public static String generateXml(String quarterYear) {

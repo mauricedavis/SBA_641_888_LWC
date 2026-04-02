@@ -280,6 +280,11 @@ public class SBA888_XMLBatch implements Database.Batchable<SObject>, Database.St
         return '<' + tag + '>' + escaped + '</' + tag + '>\n';
     }
 
+    // Public static version for use by SBA888ValidationService
+    public static String mapTopicStatic(String topic) {
+        return mapTopic(topic);
+    }
+
     // Map SBA888Batch topic values to valid XSD enum values
     private static String mapTopic(String topic) {
         if (topic == null) return 'Other';
