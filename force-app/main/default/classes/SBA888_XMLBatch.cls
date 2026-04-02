@@ -19,6 +19,17 @@ public class SBA888_XMLBatch implements Database.Batchable<SObject>, Database.St
         this.varQuarterYear = varQuarterYear;
     }
 
+    // Backward-compatible constructors for SBA888_XMLBatchFlow and test classes
+    // Extra parameters (startDate, endDate, recordTypeId) are ignored — 
+    // this batch derives dates from the quarterYear and queries by RecordType
+    public SBA888_XMLBatch(Date startDate, Date endDate, String varRecordTypeId, String varQuarterYear) {
+        this.varQuarterYear = varQuarterYear;
+    }
+
+    public SBA888_XMLBatch(String varQuarterYear, String ignored) {
+        this.varQuarterYear = varQuarterYear;
+    }
+
     public Database.QueryLocator start(Database.BatchableContext bc) {
         ownerEmail = [SELECT Email FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1].Email;
 
