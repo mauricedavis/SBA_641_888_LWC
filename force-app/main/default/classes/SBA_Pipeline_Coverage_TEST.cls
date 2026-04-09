@@ -103,26 +103,26 @@ public class SBA_Pipeline_Coverage_TEST {
             new NexusValidationService.ValidationResult('a00', 'PTN001', 'Field', 'ERROR', 'msg');
         System.assertEquals('ERROR', vr.severity);
         NexusValidationService.validate888Records(new List<SBA_888_Output__c>());
-        // Pass 1: invalid phone + Canada country + no session id
+        // Pass 1: invalid phone + Canada country + SessionId__c populated
         List<SBA_641_Output__c> recs = [SELECT Id, PartnerClientNumber__c, LocationCode__c,
             LastClientNamePart1__c, FirstClientNamePart1__c, RaceClientIntake__c,
             EthnicityClientIntake__c, SexClientIntake__c, MilitaryStatusClientIntake__c,
             SessionType_CounselorRecord__c, PrimaryPhonePart1__c, SecondaryPhonePart1__c,
             Primary_PhonePart3__c, Secondary_PhonePart3__c, CountryAddressPart1__c,
             Country_AddressPart3__c, DateCounseled_CounselorRecord__c,
-            PartnerSessionNumber_Counselor__c FROM SBA_641_Output__c LIMIT 10];
+            PartnerSessionNumber_Counselor__c, SessionId__c FROM SBA_641_Output__c LIMIT 10];
         NexusValidationService.validate641Records(recs);
-        // Pass 2: invalid phone + valid session Id + long/short phone on Part3 hits phoneZeroed branch
+        // Pass 2: more phone branches + valid session Id
         for (SBA_641_Output__c rec : recs) {
-            rec.PartnerSessionNumber_Counselor__c = rec.Id; // valid Id format, no Session record found -> zeroed
-            rec.PrimaryPhonePart1__c = '61655512341234'; // >10 digits
-            rec.Primary_PhonePart3__c = '12'; // <10 digits
-            rec.SecondaryPhonePart1__c = '6165551234'; // valid
+            rec.PartnerSessionNumber_Counselor__c = rec.Id;
+            rec.PrimaryPhonePart1__c = '61655512341234';
+            rec.Primary_PhonePart3__c = '12';
+            rec.SecondaryPhonePart1__c = '6165551234';
         }
         NexusValidationService.validate641Records(recs);
-        // Pass 3: blank race, invalid ethnicity, invalid sex, invalid military, invalid session type
+        // Pass 3: blank race, invalid ethnicity/sex/military/session type
         for (SBA_641_Output__c rec : recs) {
-            rec.PrimaryPhonePart1__c = '6165551234'; // valid - no phone issues
+            rec.PrimaryPhonePart1__c = '6165551234';
             rec.Primary_PhonePart3__c = null;
             rec.PartnerSessionNumber_Counselor__c = null;
             rec.RaceClientIntake__c = null;

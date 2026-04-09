@@ -20,6 +20,7 @@ public with sharing class NexusValidationService {
         @AuraEnabled public String severity;     // 'ERROR' | 'WARNING'
         @AuraEnabled public String message;
         @AuraEnabled public String displayLabel;
+        @AuraEnabled public String eventId;      // Session__c Id (641) or Event__c Id (888)
 
         public ValidationResult(String recordId, String partnerNumber,
                                   String field, String severity, String message) {
@@ -56,7 +57,6 @@ public with sharing class NexusValidationService {
     public static List<ValidationResult> validate641Records(List<SBA_641_Output__c> records) {
 
         // ── Step 1: Pre-fetch Contact phones for records with invalid phones ──
-        // Collect Session Ids from all records that have a potentially invalid phone
         Set<Id> sessionIds = new Set<Id>();
         for (SBA_641_Output__c r : records) {
             if (hasInvalidPhone(r.PrimaryPhonePart1__c) || hasInvalidPhone(r.Primary_PhonePart3__c)) {
@@ -86,7 +86,7 @@ public with sharing class NexusValidationService {
                     String normalized = normalizePhone10(ph);
                     if (normalized != null) {
                         sessionToValidPhone.put(s.Id, normalized);
-                        break; // use first valid number found
+                        break;
                     }
                 }
             }
@@ -94,8 +94,8 @@ public with sharing class NexusValidationService {
 
         // ── Step 2: Auto-correct Output records and collect DML updates ───────
         List<SBA_641_Output__c> toUpdate = new List<SBA_641_Output__c>();
-        Map<Id, String> autocorrectedPhone = new Map<Id, String>(); // recordId → corrected phone
-        Map<Id, Boolean> phoneZeroed = new Map<Id, Boolean>();      // recordId → zeroed out (no valid alt)
+        Map<Id, String> autocorrectedPhone = new Map<Id, String>();
+        Map<Id, Boolean> phoneZeroed = new Map<Id, Boolean>();
 
         for (SBA_641_Output__c r : records) {
             Boolean needsUpdate = false;
@@ -135,21 +135,23 @@ public with sharing class NexusValidationService {
         for (SBA_641_Output__c r : records) {
             String id = r.Id;
             String pn = String.isNotBlank(r.PartnerClientNumber__c) ? r.PartnerClientNumber__c : r.Id;
+            // SessionId__c holds the Session__c Id — used for the record link in the validation panel
+            String sid = r.SessionId__c;
 
-            if (String.isBlank(r.PartnerClientNumber__c)) err(out,id,pn,'PartnerClientNumber','Required — cannot be blank');
-            if (String.isBlank(r.LocationCode__c))        err(out,id,pn,'LocationCode','Required — cannot be blank');
-            if (String.isBlank(r.LastClientNamePart1__c)) err(out,id,pn,'LastName (Part1)','Required per XSD PersonType');
-            if (String.isBlank(r.FirstClientNamePart1__c))err(out,id,pn,'FirstName (Part1)','Required per XSD PersonType');
-            if (String.isBlank(r.PartnerSessionNumber_Counselor__c)) err(out,id,pn,'PartnerSessionNumber','Required — cannot be blank');
+            if (String.isBlank(r.PartnerClientNumber__c)) err(out,id,pn,sid,'PartnerClientNumber','Required — cannot be blank');
+            if (String.isBlank(r.LocationCode__c))        err(out,id,pn,sid,'LocationCode','Required — cannot be blank');
+            if (String.isBlank(r.LastClientNamePart1__c)) err(out,id,pn,sid,'LastName (Part1)','Required per XSD PersonType');
+            if (String.isBlank(r.FirstClientNamePart1__c))err(out,id,pn,sid,'FirstName (Part1)','Required per XSD PersonType');
+            if (String.isBlank(r.PartnerSessionNumber_Counselor__c)) err(out,id,pn,sid,'PartnerSessionNumber','Required — cannot be blank');
 
             // Race
             if (String.isBlank(r.RaceClientIntake__c)) {
-                err(out,id,pn,'Race','XSD requires at least one Race code — field is blank');
+                err(out,id,pn,sid,'Race','XSD requires at least one Race code — field is blank');
             } else {
                 List<String> codes = SBA641NormalizationHelper.getRaceCodes(r.RaceClientIntake__c);
-                if (codes.isEmpty()) err(out,id,pn,'Race','No valid codes resolved from: "' + r.RaceClientIntake__c + '"');
+                if (codes.isEmpty()) err(out,id,pn,sid,'Race','No valid codes resolved from: "' + r.RaceClientIntake__c + '"');
                 for (String code : codes) {
-                    if (!VALID_RACE.contains(code)) warn(out,id,pn,'Race','Value "' + code + '" not in XSD enum');
+                    if (!VALID_RACE.contains(code)) warn(out,id,pn,sid,'Race','Value "' + code + '" not in XSD enum');
                 }
             }
 
@@ -157,36 +159,36 @@ public with sharing class NexusValidationService {
             if (String.isNotBlank(r.EthnicityClientIntake__c)) {
                 String eth = SBA641NormalizationHelper.normalizeEthnicity(r.EthnicityClientIntake__c);
                 if (!VALID_ETHNICITY.contains(eth))
-                    warn(out,id,pn,'Ethnicity','"' + r.EthnicityClientIntake__c + '" will normalize to "' + eth + '"');
+                    warn(out,id,pn,sid,'Ethnicity','"' + r.EthnicityClientIntake__c + '" will normalize to "' + eth + '"');
             }
 
             // Sex
             if (String.isNotBlank(r.SexClientIntake__c) && !VALID_SEX.contains(r.SexClientIntake__c))
-                warn(out,id,pn,'Sex','"' + r.SexClientIntake__c + '" not in XSD enum (Male/Female/empty)');
+                warn(out,id,pn,sid,'Sex','"' + r.SexClientIntake__c + '" not in XSD enum (Male/Female/empty)');
 
-            // Phone — auto-corrected records warn; zeroed records error; others check normally
+            // Phone
             if (phoneZeroed.containsKey(id)) {
-                warn(out,id,pn,'PrimaryPhone','No valid phone found on Contact — set to 000-000-0000. Please update before submitting to SBA.');
+                warn(out,id,pn,sid,'PrimaryPhone','No valid phone found on Contact — set to 000-000-0000. Please update before submitting to SBA.');
             } else if (autocorrectedPhone.containsKey(id)) {
-                warn(out,id,pn,'PrimaryPhone','Auto-corrected from Contact — using ' + autocorrectedPhone.get(id));
+                warn(out,id,pn,sid,'PrimaryPhone','Auto-corrected from Contact — using ' + autocorrectedPhone.get(id));
             } else {
-                phoneCheck(out,id,pn,r.PrimaryPhonePart1__c,'PrimaryPhone (Part1)');
-                phoneCheck(out,id,pn,r.Primary_PhonePart3__c,'PrimaryPhone (Part3)');
+                phoneCheck(out,id,pn,sid,r.PrimaryPhonePart1__c,'PrimaryPhone (Part1)');
+                phoneCheck(out,id,pn,sid,r.Primary_PhonePart3__c,'PrimaryPhone (Part3)');
             }
 
             // Country
-            countryCheck(out,id,pn,r.CountryAddressPart1__c,'Country (Part1)');
-            countryCheck(out,id,pn,r.Country_AddressPart3__c,'Country (Part3)');
+            countryCheck(out,id,pn,sid,r.CountryAddressPart1__c,'Country (Part1)');
+            countryCheck(out,id,pn,sid,r.Country_AddressPart3__c,'Country (Part3)');
 
             // Military status
             if (String.isNotBlank(r.MilitaryStatusClientIntake__c)
                     && !VALID_MILITARY.contains(r.MilitaryStatusClientIntake__c))
-                warn(out,id,pn,'MilitaryStatus','"' + r.MilitaryStatusClientIntake__c + '" not in XSD enum');
+                warn(out,id,pn,sid,'MilitaryStatus','"' + r.MilitaryStatusClientIntake__c + '" not in XSD enum');
 
             // Session type
             if (String.isNotBlank(r.SessionType_CounselorRecord__c)
                     && !VALID_SESSION_TYPE.contains(r.SessionType_CounselorRecord__c))
-                warn(out,id,pn,'SessionType','"' + r.SessionType_CounselorRecord__c + '" not in XSD enum');
+                warn(out,id,pn,sid,'SessionType','"' + r.SessionType_CounselorRecord__c + '" not in XSD enum');
         }
         return out;
     }
@@ -194,14 +196,12 @@ public with sharing class NexusValidationService {
     // ── 888 validation (stub — mirrors 641 structure) ─────────────────────────
 
     public static List<ValidationResult> validate888Records(List<SBA_888_Output__c> records) {
-        // 888 validation — full implementation pending 888 wizard refactor
         List<ValidationResult> out = new List<ValidationResult>();
         return out;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Returns true if the phone string is present but not a valid 10-digit number */
     private static Boolean hasInvalidPhone(String raw) {
         if (String.isBlank(raw)) return false;
         String d = raw.replaceAll('[^0-9]', '');
@@ -209,7 +209,6 @@ public with sharing class NexusValidationService {
         return d.length() != 10;
     }
 
-    /** Returns normalized 10-digit string if valid, null otherwise */
     private static String normalizePhone10(String raw) {
         if (String.isBlank(raw)) return null;
         String d = raw.replaceAll('[^0-9]', '');
@@ -218,24 +217,28 @@ public with sharing class NexusValidationService {
         return null;
     }
 
-    private static void phoneCheck(List<ValidationResult> o, String id, String pn, String raw, String lbl) {
+    private static void phoneCheck(List<ValidationResult> o, String id, String pn, String sid, String raw, String lbl) {
         if (String.isBlank(raw)) return;
         String d = raw.replaceAll('[^0-9]','');
         if (d.length() == 11 && d.startsWith('1')) d = d.substring(1);
-        if      (d.length() > 10) warn(o,id,pn,lbl,'Has ' + d.length() + ' digits — will truncate to 10');
-        else if (d.length() < 10) err(o,id,pn,lbl,'Only ' + d.length() + ' digits — no valid alternative found on Contact');
+        if      (d.length() > 10) warn(o,id,pn,sid,lbl,'Has ' + d.length() + ' digits — will truncate to 10');
+        else if (d.length() < 10) err(o,id,pn,sid,lbl,'Only ' + d.length() + ' digits — no valid alternative found on Contact');
     }
 
-    private static void countryCheck(List<ValidationResult> o, String id, String pn, String raw, String lbl) {
+    private static void countryCheck(List<ValidationResult> o, String id, String pn, String sid, String raw, String lbl) {
         if (String.isBlank(raw)) return;
         if (raw != 'United States' && raw != 'USA' && raw != 'US')
-            warn(o,id,pn,lbl,'"' + raw + '" is non-standard — will normalize to "United States"');
+            warn(o,id,pn,sid,lbl,'"' + raw + '" is non-standard — will normalize to "United States"');
     }
 
-    private static void err(List<ValidationResult> o, String id, String pn, String f, String msg) {
-        o.add(new ValidationResult(id, pn, f, 'ERROR', msg));
+    private static void err(List<ValidationResult> o, String id, String pn, String sid, String f, String msg) {
+        ValidationResult vr = new ValidationResult(id, pn, f, 'ERROR', msg);
+        vr.eventId = sid;
+        o.add(vr);
     }
-    private static void warn(List<ValidationResult> o, String id, String pn, String f, String msg) {
-        o.add(new ValidationResult(id, pn, f, 'WARNING', msg));
+    private static void warn(List<ValidationResult> o, String id, String pn, String sid, String f, String msg) {
+        ValidationResult vr = new ValidationResult(id, pn, f, 'WARNING', msg);
+        vr.eventId = sid;
+        o.add(vr);
     }
 }

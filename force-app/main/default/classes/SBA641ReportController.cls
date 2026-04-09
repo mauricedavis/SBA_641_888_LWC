@@ -47,7 +47,7 @@ public with sharing class SBA641ReportController {
         };
     }
 
-    // ── Step 2: Extract Sessions ───────────────────────────────────────────────
+    // ── Step 2: Extract Sessions ──────────────────────────────────────────────
 
     @AuraEnabled
     public static String extractSessions(String quarterYear) {
@@ -79,7 +79,7 @@ public with sharing class SBA641ReportController {
         return String.valueOf(Database.executeBatch(batch, 10));
     }
 
-    // ── Step 3: Validate ───────────────────────────────────────────────────────
+    // ── Step 3: Validate ───────────────────────────────────────────────────
 
     @AuraEnabled(cacheable=false)
     public static Map<String, Object> validateQuarter(String quarterYear) {
@@ -91,7 +91,8 @@ public with sharing class SBA641ReportController {
                    PrimaryPhonePart1__c, SecondaryPhonePart1__c,
                    Primary_PhonePart3__c, Secondary_PhonePart3__c,
                    CountryAddressPart1__c, Country_AddressPart3__c,
-                   DateCounseled_CounselorRecord__c, PartnerSessionNumber_Counselor__c
+                   DateCounseled_CounselorRecord__c, PartnerSessionNumber_Counselor__c,
+                   SessionId__c
             FROM SBA_641_Output__c
             WHERE Quarter_Year__c = :quarterYear
             LIMIT 2000
@@ -115,7 +116,7 @@ public with sharing class SBA641ReportController {
         };
     }
 
-    // ── Step 5: Generate XML ───────────────────────────────────────────────────
+    // ── Step 5: Generate XML ──────────────────────────────────────────────────
 
     @AuraEnabled
     public static String generateXml(String quarterYear, String reportType) {
@@ -124,7 +125,7 @@ public with sharing class SBA641ReportController {
         );
     }
 
-    // ── Job status polling ─────────────────────────────────────────────────────
+    // ── Job status polling ──────────────────────────────────────────────────────
 
     @AuraEnabled(cacheable=false)
     public static Map<String, Object> pollJobStatus(String jobId) {
@@ -151,14 +152,14 @@ public with sharing class SBA641ReportController {
         };
     }
 
-    // ── Output record count ────────────────────────────────────────────────────
+    // ── Output record count ───────────────────────────────────────────────────
 
     @AuraEnabled(cacheable=false)
     public static Integer getOutputCount(String quarterYear) {
         return [SELECT COUNT() FROM SBA_641_Output__c WHERE Quarter_Year__c = :quarterYear];
     }
 
-    // ── Record Type check ──────────────────────────────────────────────────────
+    // ── Record Type check ────────────────────────────────────────────────────
 
     @AuraEnabled(cacheable=true)
     public static Boolean recordTypeExists(String quarterYear) {
@@ -168,8 +169,6 @@ public with sharing class SBA641ReportController {
     }
 
     // ── Run State Persistence (Dynamic Apex — avoids FLS compile issues) ───────
-    // Uses dynamic SOQL/DML so SBA641_Run_State__c is resolved at runtime,
-    // not at compile time. This bypasses profile FLS restrictions on the type.
 
     private static final String RUN_STATE_OBJECT = 'SBA641_Run_State__c';
 
@@ -177,8 +176,6 @@ public with sharing class SBA641ReportController {
     public static void saveRunState(Map<String, Object> state) {
         try {
             Id userId = UserInfo.getUserId();
-
-            // Check for existing in-progress record
             String query = 'SELECT Id FROM ' + RUN_STATE_OBJECT
                 + ' WHERE OwnerId = \'' + userId + '\''
                 + ' AND Run_Status__c = \'In Progress\' LIMIT 1';
@@ -204,7 +201,6 @@ public with sharing class SBA641ReportController {
 
             upsert rec;
         } catch(Exception e) {
-            // Silently fail — run state persistence is non-critical
             System.debug('saveRunState failed: ' + e.getMessage());
         }
     }
@@ -257,14 +253,11 @@ public with sharing class SBA641ReportController {
         }
     }
 
-    // ── Get part file ContentVersions for client-side merge ───────────────────
-    // Returns ordered list of {cvId, title} for all parts linked to the
-    // most recent SBA641_XML_Upload__c for this quarter.
+    // ── Get part file ContentVersions for client-side merge ─────────────────
     @AuraEnabled(cacheable=false)
     public static List<Map<String,String>> getXmlPartFiles(String quarterYear) {
         List<Map<String,String>> result = new List<Map<String,String>>();
 
-        // Find the most recent upload record for this quarter
         List<SBA641_XML_Upload__c> uploads = [
             SELECT Id FROM SBA641_XML_Upload__c
             WHERE QuarterYear__c = :quarterYear
@@ -274,7 +267,6 @@ public with sharing class SBA641ReportController {
 
         Id uploadId = uploads[0].Id;
 
-        // Step 1: Get ContentDocument Ids linked to the upload record
         Set<Id> docIds = new Set<Id>();
         for (ContentDocumentLink cdl : [
             SELECT ContentDocumentId FROM ContentDocumentLink
@@ -284,7 +276,6 @@ public with sharing class SBA641ReportController {
         }
         if (docIds.isEmpty()) return result;
 
-        // Step 2: Get matching ContentVersions ordered by title
         for (ContentVersion cv : [
             SELECT Id, Title, ContentDocumentId
             FROM ContentVersion
@@ -300,24 +291,20 @@ public with sharing class SBA641ReportController {
         }
         return result;
     }
-	@AuraEnabled(cacheable=false)
-	public static Id getUploadRecordId(String quarterYear) {
-    List<SBA641_XML_Upload__c> uploads = [
-        SELECT Id FROM SBA641_XML_Upload__c
-        WHERE QuarterYear__c = :quarterYear
-        ORDER BY CreatedDate DESC LIMIT 1
-    ];
-    return uploads.isEmpty() ? null : uploads[0].Id;
-	}
-	// ADD to SBA641ReportController.cls before the final closing }
- 
-    // Returns the VF base URL (vf.force.com) for direct same-session fetch() calls
-    // This avoids the lightning.force.com → vf.force.com redirect that breaks CORS
+
+    @AuraEnabled(cacheable=false)
+    public static Id getUploadRecordId(String quarterYear) {
+        List<SBA641_XML_Upload__c> uploads = [
+            SELECT Id FROM SBA641_XML_Upload__c
+            WHERE QuarterYear__c = :quarterYear
+            ORDER BY CreatedDate DESC LIMIT 1
+        ];
+        return uploads.isEmpty() ? null : uploads[0].Id;
+    }
+
     @AuraEnabled(cacheable=true)
     public static String getVfBaseUrl() {
         String orgUrl = URL.getOrgDomainUrl().toExternalForm();
-        // Convert: https://michigansbdcatgrandvalleystateuniv--fullsb.sandbox.my.salesforce.com
-        // To:      https://michigansbdcatgrandvalleystateuniv--fullsb.sandbox.vf.force.com
         return orgUrl
             .replace('.sandbox.my.salesforce.com', '.sandbox.vf.force.com')
             .replace('.my.salesforce.com', '.vf.force.com');
