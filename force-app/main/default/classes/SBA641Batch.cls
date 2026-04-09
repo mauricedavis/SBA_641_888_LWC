@@ -745,8 +745,8 @@ if (String.isBlank(newRecord.BusinessType_ClientIntake__c)
 }
 
 
-            // Assuming `record` is the object with `Female_Ownership__c` field and `newRecord` is the output object with `BusinessOwnership_Female__c` field
-            newRecord.BusinessOwnership_Female__c = (session.Account__r.Female_Ownership__c == null) ? 0 : session.Account__r.Female_Ownership__c;
+            // FIX: Cap BusinessOwnership_Female__c at 100 - source data can exceed field limit of 999
+            Decimal femaleOwnership = session.Account__r.Female_Ownership__c; newRecord.BusinessOwnership_Female__c = (femaleOwnership == null) ? 0 : Math.min(femaleOwnership, 100);
             
             // Translate boolean to "Yes"/"No" for ConductingBusinessOnline_ClientIntake__c
             if (session.Account__r.Online_Presence__c == true) {
