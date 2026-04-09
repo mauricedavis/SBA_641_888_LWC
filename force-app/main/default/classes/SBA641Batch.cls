@@ -719,7 +719,11 @@ if ('Internet'.equalsIgnoreCase(newRecord.Media_ClientIntake__c)) {
                 '81 Other Services (Except Public Administration)' => 'Other Services (except Public Administration)',
                 'Waste Management &amp Remediation Services' => 'Waste Management and Remediation Services',
                 'Waste Management & Remediation Services' => 'Waste Management and Remediation Services',
-                'Not Set' => 'Other Services (except Public Administration)'
+                'Not Set' => 'Other Services (except Public Administration)',
+                'Consumer Goods' => 'Retail Trade',
+                'Information Technology and Services' => 'Information',
+                'Agriculture, Forestry, Fishing and Hunting' => 'Agriculture, Forestry, Fishing and Hunting',
+                'Real Estate and Rental and Leasing' => 'Real Estate and Rental and Leasing'
             };
 
 // Check if the Account__r.Industry has a matching translation in the map
