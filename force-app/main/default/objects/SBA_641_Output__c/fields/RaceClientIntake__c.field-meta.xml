@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>RaceClientIntake__c</fullName>
+    <description>Contact__r.hed__Race__c (CounselingRecord_ClientIntake_Race_Code) - no abbreviations</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Contact__r.hed__Race__c (CounselingRecord_ClientIntake_Race_Code) - no abbreviations</inlineHelpText>
+    <label>Race_ClientIntake</label>
+    <length>80</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

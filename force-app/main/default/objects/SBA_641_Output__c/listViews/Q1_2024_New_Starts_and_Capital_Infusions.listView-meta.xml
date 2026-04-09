@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Q1_2024_New_Starts_and_Capital_Infusions</fullName>
+    <columns>NAME</columns>
+    <columns>RECORDTYPE</columns>
+    <columns>Quarter_Year__c</columns>
+    <columns>CREATED_DATE</columns>
+    <columns>LastClientNamePart1__c</columns>
+    <columns>FirstClientNamePart1__c</columns>
+    <columns>ReportableImpact__c</columns>
+    <columns>DateofReportableImpact__c</columns>
+    <columns>SBALoanAmount_CounselorRecord__c</columns>
+    <columns>SBALoanAmountTxnNmbCounselorRecord__c</columns>
+    <columns>NonSBALoanAmount_CounselorRecord__c</columns>
+    <columns>NonSBALoanAmountTxnNmbCounselorRecord__c</columns>
+    <columns>EquityCapitalReceived_CounselorRecord__c</columns>
+    <columns>EquityCapitalReceivedTxnNmbCounselorRec__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>RECORDTYPE</field>
+        <operation>equals</operation>
+        <value>SBA_641_Output__c.Q1_2024</value>
+    </filters>
+    <label>Q1_2024_New Starts and Capital Infusions</label>
+</ListView>

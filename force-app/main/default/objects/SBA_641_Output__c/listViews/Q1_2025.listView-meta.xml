@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Q1_2025</fullName>
+    <columns>NAME</columns>
+    <columns>RECORDTYPE</columns>
+    <columns>Errors__c</columns>
+    <columns>LastClientNamePart1__c</columns>
+    <columns>MilitaryStatusClientIntake__c</columns>
+    <columns>BranchOfService_ClientIntake__c</columns>
+    <columns>CurrentlyInBusiness_ClientIntake__c</columns>
+    <columns>BusinessType_ClientIntake__c</columns>
+    <columns>Media_ClientIntake__c</columns>
+    <columns>Internet_Media_ClientIntake__c</columns>
+    <columns>ExportCountries_ClientIntake__c</columns>
+    <columns>ExportCountries_CounselorRecord__c</columns>
+    <columns>PartnerClientNumber__c</columns>
+    <columns>PartnerSessionNumber_Counselor__c</columns>
+    <columns>ReportableImpact__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>RECORDTYPE</field>
+        <operation>equals</operation>
+        <value>SBA_641_Output__c.Q1_2025</value>
+    </filters>
+    <label>Q1_2025</label>
+</ListView>

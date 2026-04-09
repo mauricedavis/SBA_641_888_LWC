@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>LegalEntity_Other_ClientIntake__c</fullName>
+    <description>Account__r.Other_Entity_Type__c (CounselingRecord_ClientIntake_LegalEntity_Other) - When &apos;LegalEntity&apos;=Other, this field is required.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Account__r.Other_Entity_Type__c (CounselingRecord_ClientIntake_LegalEntity_Other) - When &apos;LegalEntity&apos;=Other, this field is required.</inlineHelpText>
+    <label>LegalEntity_Other_ClientIntake</label>
+    <length>80</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

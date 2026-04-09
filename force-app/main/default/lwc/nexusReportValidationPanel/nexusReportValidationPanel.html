@@ -17,24 +17,34 @@
                 <lightning-accordion-section name="errors" label="Errors" if:true={errorCount}>
                     <template for:each={errors} for:item="r">
                         <p key={r.recordId} class="slds-m-bottom_xx-small">
-                            ⛔&nbsp;
+                            ⛔ 
                             <a href={r.recordUrl} target="_blank" rel="noopener noreferrer"
-                               class="slds-text-color_error" title="Open record in new tab">
-                                {r.partnerNumber}
+                               class="slds-text-color_error" title="Open 888 Output record">
+                                {r.partnerTrainingNumber}
                             </a>
-                            &nbsp;— {r.field}: {r.message}
+                             | 
+                            <a href={r.eventUrl} target="_blank" rel="noopener noreferrer"
+                               class="slds-text-color_error" title="Open source Event record">
+                                Event ↗
+                            </a>
+                             — {r.field}: {r.message}
                         </p>
                     </template>
                 </lightning-accordion-section>
                 <lightning-accordion-section name="warnings" label="Warnings" if:true={warningCount}>
                     <template for:each={warnings} for:item="r">
                         <p key={r.recordId} class="slds-m-bottom_xx-small">
-                            ⚠️&nbsp;
+                            ⚠️ 
                             <a href={r.recordUrl} target="_blank" rel="noopener noreferrer"
-                               title="Open record in new tab">
-                                {r.partnerNumber}
+                               title="Open 888 Output record">
+                                {r.partnerTrainingNumber}
                             </a>
-                            &nbsp;— {r.field}: {r.message}
+                             | 
+                            <a href={r.eventUrl} target="_blank" rel="noopener noreferrer"
+                               title="Open source Event record">
+                                Event ↗
+                            </a>
+                             — {r.field}: {r.message}
                         </p>
                     </template>
                 </lightning-accordion-section>

@@ -38,7 +38,7 @@ public with sharing class SBA888ReportController {
         };
     }
 
-    // ── Check if RecordType exists for this quarter ────────────────────────────
+    // ── Check if RecordType exists for this quarter ─────────────────────────
     @AuraEnabled(cacheable=false)
     public static Boolean recordTypeExists(String quarterYear) {
         return ![SELECT Id FROM RecordType
@@ -46,7 +46,7 @@ public with sharing class SBA888ReportController {
                  AND DeveloperName = :quarterYear LIMIT 1].isEmpty();
     }
 
-    // ── Extract events → SBA_888_Output__c ────────────────────────────────────
+    // ── Extract events → SBA_888_Output__c ───────────────────────────────
     @AuraEnabled(cacheable=false)
     public static String extractEvents(String quarterYear) {
         Map<String,String> dates = getQuarterDates(quarterYear);
@@ -62,14 +62,14 @@ public with sharing class SBA888ReportController {
         ));
     }
 
-    // ── Get count of extracted output records ──────────────────────────────────
+    // ── Get count of extracted output records ────────────────────────────
     @AuraEnabled(cacheable=false)
     public static Integer getOutputCount(String quarterYear) {
         return [SELECT COUNT() FROM SBA_888_Output__c
                 WHERE RecordType.DeveloperName = :quarterYear];
     }
 
-    // ── Poll batch job status ──────────────────────────────────────────────────
+    // ── Poll batch job status ────────────────────────────────────────────
     @AuraEnabled(cacheable=false)
     public static Map<String,Object> pollJobStatus(String jobId) {
         AsyncApexJob job = [SELECT Id, Status, NumberOfErrors, JobItemsProcessed,
@@ -87,7 +87,7 @@ public with sharing class SBA888ReportController {
         };
     }
 
-    // ── Validate extracted output records against XSD ────────────────────────────
+    // ── Validate extracted output records against XSD ───────────────────────
     @AuraEnabled(cacheable=false)
     public static Map<String,Object> validateQuarter(String quarterYear) {
         SBA888ValidationService.ValidationSummary summary =
@@ -95,11 +95,12 @@ public with sharing class SBA888ReportController {
         List<Map<String,Object>> results = new List<Map<String,Object>>();
         for (SBA888ValidationService.ValidationResult r : summary.results) {
             results.add(new Map<String,Object>{
-                'recordId'             => r.recordId,
-                'partnerTrainingNumber' => r.partnerTrainingNumber,
-                'severity'             => r.severity,
-                'field'                => r.field,
-                'message'              => r.message
+                'recordId'              => r.recordId,
+                'eventId'               => r.eventId,
+                'partnerTrainingNumber'  => r.partnerTrainingNumber,
+                'severity'              => r.severity,
+                'field'                 => r.field,
+                'message'               => r.message
             });
         }
         return new Map<String,Object>{
@@ -110,7 +111,7 @@ public with sharing class SBA888ReportController {
         };
     }
 
-    // ── Generate XML ───────────────────────────────────────────────────────────
+    // ── Generate XML ──────────────────────────────────────────────────────
     @AuraEnabled(cacheable=false)
     public static String generateXml(String quarterYear) {
         return String.valueOf(
@@ -118,7 +119,7 @@ public with sharing class SBA888ReportController {
         );
     }
 
-    // ── Get XML part files for this quarter ────────────────────────────────────
+    // ── Get XML part files for this quarter ────────────────────────────
     @AuraEnabled(cacheable=false)
     public static List<Map<String,String>> getXmlPartFiles(String quarterYear) {
         List<Map<String,String>> result = new List<Map<String,String>>();
@@ -146,7 +147,7 @@ public with sharing class SBA888ReportController {
         return result;
     }
 
-    // ── Get upload record Id ───────────────────────────────────────────────────
+    // ── Get upload record Id ──────────────────────────────────────────────
     @AuraEnabled(cacheable=false)
     public static Id getUploadRecordId(String quarterYear) {
         List<SBA888_XML_Upload__c> uploads = [

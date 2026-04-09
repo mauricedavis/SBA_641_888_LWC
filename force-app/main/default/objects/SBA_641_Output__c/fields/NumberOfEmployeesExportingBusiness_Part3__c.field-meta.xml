@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>NumberOfEmployeesExportingBusiness_Part3__c</fullName>
+    <description>Account__r.Export_Employees__c (CounselingRecord_CounselorRecord_NumberOfEmployeesInExportingBusiness)</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Account__r.Export_Employees__c (CounselingRecord_CounselorRecord_NumberOfEmployeesInExportingBusiness)</inlineHelpText>
+    <label>NumberOfEmployeesExportingBusiness_Part3</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

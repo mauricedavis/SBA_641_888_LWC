@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SurveyAgreement__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Account__r.Share_with_SBA__c (CounselingRecord_ClientRequest_SurveyAgreement) - Yes/No Checkbox</description>
+    <inlineHelpText>Account__r.Share_with_SBA__c (CounselingRecord_ClientRequest_SurveyAgreement) - Yes/No Checkbox</inlineHelpText>
+    <label>SurveyAgreement</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

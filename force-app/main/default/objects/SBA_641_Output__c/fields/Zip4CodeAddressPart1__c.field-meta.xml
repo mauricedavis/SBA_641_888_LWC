@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Zip4CodeAddressPart1__c</fullName>
+    <description>Currently included in Account__r.ZipCode field, so we have to parse the Zip+4 from that field (CounselingRecord_ClientRequest_AddressPart1_Zip4Code)</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Currently included in Account__r.ZipCode field, so we have to parse the Zip+4 from that field (CounselingRecord_ClientRequest_AddressPart1_Zip4Code)</inlineHelpText>
+    <label>Zip4Code_AddressPart1</label>
+    <length>4</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

@@ -16,6 +16,7 @@ public with sharing class SBA888ValidationService {
     // ── Result types ──────────────────────────────────────────────────────────
     public class ValidationResult {
         @AuraEnabled public String recordId;
+        @AuraEnabled public String eventId;
         @AuraEnabled public String partnerTrainingNumber;
         @AuraEnabled public String severity;  // ERROR | WARNING
         @AuraEnabled public String field;
@@ -67,7 +68,7 @@ public with sharing class SBA888ValidationService {
     // ── Main validation entry point ────────────────────────────────────────────
     public static ValidationSummary validate(String quarterYear) {
         List<SBA_888_Output__c> records = [
-            SELECT Id, PartnerTrainingNumber__c, LocationCode__c,
+            SELECT Id, EventId__c, PartnerTrainingNumber__c, LocationCode__c,
                    DateTrainingStarted__c, NumberOfSessions__c, TotalTrainingHours__c,
                    TrainingTitle__c, Total_NumberTrained__c, TrainingTopic__c,
                    ProgramFormatType__c, Language_Code__c, DollarAmountOfFees__c,
@@ -116,67 +117,67 @@ public with sharing class SBA888ValidationService {
     // ── Per-record validation ─────────────────────────────────────────────────
     private static List<ValidationResult> validateRecord(SBA_888_Output__c r, String ptn) {
         List<ValidationResult> out = new List<ValidationResult>();
-        String id = r.Id;
+        String id  = r.Id;
+        String eid = r.EventId__c;
 
         // ── Required fields ───────────────────────────────────────────────────
         if (String.isBlank(r.PartnerTrainingNumber__c)) {
-            err(out, id, ptn, 'PartnerTrainingNumber', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'PartnerTrainingNumber', 'Required — cannot be blank');
         } else if (r.PartnerTrainingNumber__c.length() > 20) {
-            err(out, id, ptn, 'PartnerTrainingNumber', 'Exceeds max length of 20 characters (' + r.PartnerTrainingNumber__c.length() + ')');
+            err(out, id, eid, ptn, 'PartnerTrainingNumber', 'Exceeds max length of 20 characters (' + r.PartnerTrainingNumber__c.length() + ')');
         }
 
         if (String.isBlank(r.LocationCode__c)) {
-            err(out, id, ptn, 'LocationCode', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'LocationCode', 'Required — cannot be blank');
         } else {
             try {
                 Integer loc = Integer.valueOf(r.LocationCode__c);
                 if (loc < 1 || loc > 9999999) {
-                    err(out, id, ptn, 'LocationCode', 'Must be between 1 and 9,999,999 (current: ' + loc + ')');
+                    err(out, id, eid, ptn, 'LocationCode', 'Must be between 1 and 9,999,999 (current: ' + loc + ')');
                 }
             } catch (Exception e) {
-                err(out, id, ptn, 'LocationCode', 'Must be a valid integer (current: ' + r.LocationCode__c + ')');
+                err(out, id, eid, ptn, 'LocationCode', 'Must be a valid integer (current: ' + r.LocationCode__c + ')');
             }
         }
 
         if (r.DateTrainingStarted__c == null) {
-            err(out, id, ptn, 'DateTrainingStarted', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'DateTrainingStarted', 'Required — cannot be blank');
         } else if (r.DateTrainingStarted__c > Date.today()) {
-            warn(out, id, ptn, 'DateTrainingStarted', 'Date is in the future: ' + r.DateTrainingStarted__c);
+            warn(out, id, eid, ptn, 'DateTrainingStarted', 'Date is in the future: ' + r.DateTrainingStarted__c);
         }
 
         if (r.NumberOfSessions__c == null) {
-            err(out, id, ptn, 'NumberOfSessions', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'NumberOfSessions', 'Required — cannot be blank');
         } else if (r.NumberOfSessions__c < 0 || r.NumberOfSessions__c > 1000000000) {
-            err(out, id, ptn, 'NumberOfSessions', 'Must be between 0 and 1,000,000,000 (current: ' + r.NumberOfSessions__c + ')');
+            err(out, id, eid, ptn, 'NumberOfSessions', 'Must be between 0 and 1,000,000,000 (current: ' + r.NumberOfSessions__c + ')');
         }
 
         if (r.TotalTrainingHours__c == null) {
-            err(out, id, ptn, 'TotalTrainingHours', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'TotalTrainingHours', 'Required — cannot be blank');
         } else if (r.TotalTrainingHours__c < 0.01 || r.TotalTrainingHours__c > 9999.99) {
-            err(out, id, ptn, 'TotalTrainingHours', 'Must be between 0.01 and 9,999.99 (current: ' + r.TotalTrainingHours__c + ')');
+            err(out, id, eid, ptn, 'TotalTrainingHours', 'Must be between 0.01 and 9,999.99 (current: ' + r.TotalTrainingHours__c + ')');
         }
 
         if (String.isBlank(r.TrainingTitle__c)) {
-            err(out, id, ptn, 'TrainingTitle', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'TrainingTitle', 'Required — cannot be blank');
         } else if (r.TrainingTitle__c.length() > 255) {
-            err(out, id, ptn, 'TrainingTitle', 'Exceeds max length of 255 characters (' + r.TrainingTitle__c.length() + ')');
+            err(out, id, eid, ptn, 'TrainingTitle', 'Exceeds max length of 255 characters (' + r.TrainingTitle__c.length() + ')');
         }
 
         // ── NumberTrained ─────────────────────────────────────────────────────
         if (r.Total_NumberTrained__c == null) {
-            err(out, id, ptn, 'NumberTrained.Total', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'NumberTrained.Total', 'Required — cannot be blank');
         } else if (r.Total_NumberTrained__c < 1) {
-            err(out, id, ptn, 'NumberTrained.Total', 'Must be at least 1 (current: ' + r.Total_NumberTrained__c + ')');
+            err(out, id, eid, ptn, 'NumberTrained.Total', 'Must be at least 1 (current: ' + r.Total_NumberTrained__c + ')');
         }
 
         // ── TrainingTopic enum ────────────────────────────────────────────────
         if (String.isBlank(r.TrainingTopic__c)) {
-            err(out, id, ptn, 'TrainingTopic', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'TrainingTopic', 'Required — cannot be blank');
         } else if (!VALID_TOPICS.contains(r.TrainingTopic__c)) {
-            // Check if it maps to a valid value via legacy mapping
             String mapped = SBA888_XMLBatch.mapTopicStatic(r.TrainingTopic__c);
             if (mapped == null || mapped == 'Other') {
-                warn(out, id, ptn, 'TrainingTopic', 'Value "' + r.TrainingTopic__c + '" will be mapped to "Other" in the XML');
+                warn(out, id, eid, ptn, 'TrainingTopic', 'Value "' + r.TrainingTopic__c + '" will be mapped to "Other" in the XML');
             }
         }
 
@@ -196,24 +197,24 @@ public with sharing class SBA888ValidationService {
             || String.isNotBlank(r.TrainingPartners_OtherAgency_OtherGovtAg__c)
             || String.isNotBlank(r.TrainingPartners_Other_OtherResources__c);
         if (!hasPartner) {
-            err(out, id, ptn, 'TrainingPartners', 'Required — at least one training partner must be specified');
+            err(out, id, eid, ptn, 'TrainingPartners', 'Required — at least one training partner must be specified');
         }
 
         // ── ProgramFormatType enum ────────────────────────────────────────────
         if (String.isBlank(r.ProgramFormatType__c)) {
-            err(out, id, ptn, 'ProgramFormatType', 'Required — must be Hybrid, In-person, On Demand, or Online');
+            err(out, id, eid, ptn, 'ProgramFormatType', 'Required — must be Hybrid, In-person, On Demand, or Online');
         } else if (!VALID_FORMAT_TYPES.contains(r.ProgramFormatType__c)) {
-            err(out, id, ptn, 'ProgramFormatType', 'Invalid value "' + r.ProgramFormatType__c + '" — must be Hybrid, In-person, On Demand, or Online');
+            err(out, id, eid, ptn, 'ProgramFormatType', 'Invalid value "' + r.ProgramFormatType__c + '" — must be Hybrid, In-person, On Demand, or Online');
         }
 
         // ── Language enum ─────────────────────────────────────────────────────
         if (String.isBlank(r.Language_Code__c)) {
-            err(out, id, ptn, 'Language', 'Required — cannot be blank');
+            err(out, id, eid, ptn, 'Language', 'Required — cannot be blank');
         } else {
             for (String lang : r.Language_Code__c.split(';')) {
                 String trimmed = lang.trim();
                 if (!VALID_LANGUAGES.contains(trimmed)) {
-                    warn(out, id, ptn, 'Language', 'Invalid language code "' + trimmed + '" — will be rejected by SBA');
+                    warn(out, id, eid, ptn, 'Language', 'Invalid language code "' + trimmed + '" — will be rejected by SBA');
                 }
             }
         }
@@ -221,7 +222,7 @@ public with sharing class SBA888ValidationService {
         // ── DollarAmountOfFees range ──────────────────────────────────────────
         if (r.DollarAmountOfFees__c != null) {
             if (r.DollarAmountOfFees__c < 0 || r.DollarAmountOfFees__c > 1000000000) {
-                err(out, id, ptn, 'DollarAmountOfFees', 'Must be between 0 and 1,000,000,000 (current: ' + r.DollarAmountOfFees__c + ')');
+                err(out, id, eid, ptn, 'DollarAmountOfFees', 'Must be between 0 and 1,000,000,000 (current: ' + r.DollarAmountOfFees__c + ')');
             }
         }
 
@@ -229,23 +230,25 @@ public with sharing class SBA888ValidationService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    private static void err(List<ValidationResult> out, String id, String ptn, String field, String msg) {
+    private static void err(List<ValidationResult> out, String id, String eid, String ptn, String field, String msg) {
         ValidationResult r = new ValidationResult();
-        r.recordId             = id;
+        r.recordId              = id;
+        r.eventId               = eid;
         r.partnerTrainingNumber = ptn;
-        r.severity             = 'ERROR';
-        r.field                = field;
-        r.message              = msg;
+        r.severity              = 'ERROR';
+        r.field                 = field;
+        r.message               = msg;
         out.add(r);
     }
 
-    private static void warn(List<ValidationResult> out, String id, String ptn, String field, String msg) {
+    private static void warn(List<ValidationResult> out, String id, String eid, String ptn, String field, String msg) {
         ValidationResult r = new ValidationResult();
-        r.recordId             = id;
+        r.recordId              = id;
+        r.eventId               = eid;
         r.partnerTrainingNumber = ptn;
-        r.severity             = 'WARNING';
-        r.field                = field;
-        r.message              = msg;
+        r.severity              = 'WARNING';
+        r.field                 = field;
+        r.message               = msg;
         out.add(r);
     }
 }

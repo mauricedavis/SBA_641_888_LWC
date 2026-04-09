@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SBA888_LocationId_Required</fullName>
+    <active>true</active>
+    <description>Prevents Verified from being checked if EDMIS Location ID is blank. EDMIS_Location_Id__c is a formula from the Organizer Account EDMIS ID. Required for SBA 888 XML reporting pipeline.</description>
+    <errorConditionFormula>AND(ISCHANGED(Verified__c), Verified__c = TRUE, ISBLANK(EDMIS_Location_Id__c))</errorConditionFormula>
+    <errorDisplayField>Verified__c</errorDisplayField>
+    <errorMessage>This Event cannot be Verified because the Organizer Account does not have an EDMIS ID on file. Please update the Organizer Account record with a valid EDMIS ID before verifying this Event.</errorMessage>
+</ValidationRule>

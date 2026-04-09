@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>OnFileClientSignature__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Case__r.eRFC_Complete (CounselingRecord_ClientRequest_ClientSignature_OnFile)</description>
+    <inlineHelpText>Case__r.eRFC_Complete (CounselingRecord_ClientRequest_ClientSignature_OnFile)</inlineHelpText>
+    <label>OnFile_ClientSignature</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

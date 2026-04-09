@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>FIPS_Code_ClientIntake__c</fullName>
+    <description>Not currently mapped - required if &apos;Rural_vs_Urban&apos; is either &apos;Rural&apos; or &apos;Urban&apos;.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Not currently mapped - required if &apos;Rural_vs_Urban&apos; is either &apos;Rural&apos; or &apos;Urban&apos;.</inlineHelpText>
+    <label>FIPS_Code_ClientIntake</label>
+    <length>10</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

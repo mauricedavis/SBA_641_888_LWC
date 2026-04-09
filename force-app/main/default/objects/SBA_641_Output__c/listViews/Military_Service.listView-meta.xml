@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Military_Service</fullName>
+    <columns>NAME</columns>
+    <columns>Errors__c</columns>
+    <columns>RECORDTYPE</columns>
+    <columns>CREATED_DATE</columns>
+    <columns>LastClientNamePart1__c</columns>
+    <columns>FirstClientNamePart1__c</columns>
+    <columns>MilitaryStatusClientIntake__c</columns>
+    <columns>BranchOfService_ClientIntake__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Errors__c</field>
+        <operation>notEqual</operation>
+    </filters>
+    <label>Military Service</label>
+</ListView>

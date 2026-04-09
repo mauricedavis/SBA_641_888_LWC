@@ -21,7 +21,8 @@
                 <c-nexus-report-validation-panel
                     validation-results={validationResults}
                     error-count={errorCount}
-                    warning-count={warningCount}>
+                    warning-count={warningCount}
+                    object-api-name="SBA_888_Output__c">
                 </c-nexus-report-validation-panel>
             </div>
         </template>
@@ -64,7 +65,7 @@
                             <lightning-icon icon-name="utility:file" size="x-small" class="slds-m-right_x-small"></lightning-icon>
                             XML report already generated for <strong>{quarterYear}</strong> ({existingPartCount} part file(s) ready).
                             <div class="slds-m-top_x-small">
-                                <lightning-button label="&#x2B07; Download &amp; Merge XML" variant="brand"
+                                <lightning-button label="⬇ Download & Merge XML" variant="brand"
                                     icon-name="utility:download" onclick={handleDownloadAndMerge}
                                     class="slds-m-right_x-small">
                                 </lightning-button>
@@ -82,7 +83,7 @@
                                 <lightning-icon icon-name="utility:info" size="x-small" class="slds-m-right_x-small"></lightning-icon>
                                 {existingRecordCount} records already extracted for <strong>{quarterYear}</strong>.
                                 <div class="slds-m-top_x-small">
-                                    <lightning-button label="Go to Validate &#x2192;" variant="brand"
+                                    <lightning-button label="Go to Validate →" variant="brand"
                                         onclick={handleSkipToValidate} class="slds-m-right_x-small">
                                     </lightning-button>
                                     <lightning-button label="Re-Extract" variant="neutral"
@@ -95,7 +96,7 @@
 
                     <template if:false={existingRecordCount}>
                         <div class="slds-m-top_medium">
-                            <lightning-button label="Extract Events &#x2192;" variant="brand"
+                            <lightning-button label="Extract Events →" variant="brand"
                                 onclick={handleExtract} disabled={isNextDisabled}>
                             </lightning-button>
                         </div>
@@ -104,7 +105,7 @@
 
                 <!-- Step 2: Extract Events -->
                 <template if:true={isStep2}>
-                    <p class="slds-m-bottom_small">Extracting 888 events for <strong>{quarterYear}</strong>&#x2026;</p>
+                    <p class="slds-m-bottom_small">Extracting 888 events for <strong>{quarterYear}</strong>…</p>
                     <c-nexus-report-progress-tracker
                         job-id={extractJobId}
                         onjobcomplete={handleExtractComplete}>
@@ -116,38 +117,38 @@
                     <template if:true={isValidating}>
                         <div class="slds-m-bottom_small">
                             <lightning-spinner alternative-text="Validating..." size="small"></lightning-spinner>
-                            <p class="slds-m-top_small slds-text-color_weak">Validating {extractedCount} records against XSD requirements&#x2026;</p>
+                            <p class="slds-m-top_small slds-text-color_weak">Validating {extractedCount} records against XSD requirements…</p>
                         </div>
                     </template>
                     <template if:false={isValidating}>
                         <div class="slds-box slds-m-bottom_small">
                             <p><strong>Records validated:</strong> {extractedCount}</p>
-                            <p><strong>Errors:</strong> {errorCount} &nbsp;|&nbsp; <strong>Warnings:</strong> {warningCount}</p>
+                            <p><strong>Errors:</strong> {errorCount}  |  <strong>Warnings:</strong> {warningCount}</p>
                             <template if:true={hasErrors}>
                                 <p class="slds-text-color_error slds-m-top_x-small">
-                                    &#x26A0; {errorCount} error(s) found — these must be corrected before generating XML.
+                                    ⚠ {errorCount} error(s) found — these must be corrected before generating XML.
                                 </p>
                             </template>
                             <template if:false={hasErrors}>
                                 <template if:true={hasWarnings}>
                                     <p class="slds-m-top_x-small" style="color:#ff9a00">
-                                        &#x26A0; {warningCount} warning(s) — will not block XML generation.
+                                        ⚠ {warningCount} warning(s) — will not block XML generation.
                                     </p>
                                 </template>
                                 <template if:false={hasWarnings}>
-                                    <p class="slds-text-color_success slds-m-top_x-small">&#x2705; All records valid.</p>
+                                    <p class="slds-text-color_success slds-m-top_x-small">✅ All records valid.</p>
                                 </template>
                             </template>
                         </div>
                         <div class="slds-grid slds-gutters">
                             <div class="slds-col">
-                                <lightning-button label="&#x21ba; Re-Validate" variant="neutral"
+                                <lightning-button label="↺ Re-Validate" variant="neutral"
                                     onclick={handleValidate} class="slds-m-right_x-small">
                                 </lightning-button>
-                                <lightning-button label="&#x2190; Back" onclick={handleBack}></lightning-button>
+                                <lightning-button label="← Back" onclick={handleBack}></lightning-button>
                             </div>
                             <div class="slds-col slds-text-align_right">
-                                <lightning-button label="Review &amp; Confirm &#x2192;" variant="brand"
+                                <lightning-button label="Review & Confirm →" variant="brand"
                                     onclick={handleProceedToReview} disabled={hasErrors}>
                                 </lightning-button>
                             </div>
@@ -162,7 +163,7 @@
                         <p><strong>Session date range:</strong> {dateLabel}</p>
                         <p><strong>Events extracted:</strong> {extractedCount}</p>
                         <p><strong>Records validated:</strong> {extractedCount}</p>
-                        <p>{warningCount} warning(s) &#x2014; will not block XML generation</p>
+                        <p>{warningCount} warning(s) — will not block XML generation</p>
                     </div>
 
                     <!-- XML parts already exist -->
@@ -175,11 +176,11 @@
 
                     <div class="slds-grid slds-gutters">
                         <div class="slds-col">
-                            <lightning-button label="&#x2190; Back" onclick={handleBack}></lightning-button>
+                            <lightning-button label="← Back" onclick={handleBack}></lightning-button>
                         </div>
                         <div class="slds-col slds-text-align_right">
                             <template if:true={existingPartCount}>
-                                <lightning-button label="&#x2B07; Download &amp; Merge XML" variant="brand"
+                                <lightning-button label="⬇ Download & Merge XML" variant="brand"
                                     icon-name="utility:download" onclick={handleDownloadAndMerge}
                                     class="slds-m-right_x-small">
                                 </lightning-button>
@@ -194,7 +195,7 @@
                 <!-- Step 5: Generate XML -->
                 <template if:true={isStep5}>
                     <template if:false={xmlComplete}>
-                        <p class="slds-m-bottom_small">Generating 888 XML for <strong>{quarterYear}</strong>&#x2026;</p>
+                        <p class="slds-m-bottom_small">Generating 888 XML for <strong>{quarterYear}</strong>…</p>
                         <c-nexus-report-progress-tracker
                             job-id={xmlJobId}
                             onjobcomplete={handleJobComplete}>
@@ -212,7 +213,7 @@
                         </div>
                         <lightning-button
                             if:true={showDownloadButton}
-                            label="&#x2B07; Download &amp; Merge XML"
+                            label="⬇ Download & Merge XML"
                             variant="brand"
                             icon-name="utility:download"
                             onclick={handleDownloadAndMerge}>
@@ -224,7 +225,7 @@
 
             <!-- Start Over -->
             <div class="slds-m-top_medium">
-                <lightning-button label="&#x21ba; Start Over" variant="neutral"
+                <lightning-button label="↺ Start Over" variant="neutral"
                     onclick={handleStartOver} if:false={isStep1}>
                 </lightning-button>
             </div>

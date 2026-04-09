@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Primary_PhonePart3__c</fullName>
+    <description>Case__r.Contact.Phone (CounselingRecord_CounselorRecord_PhonePart3_Primary)</description>
+    <inlineHelpText>Case__r.Contact.Phone (CounselingRecord_CounselorRecord_PhonePart3_Primary)</inlineHelpText>
+    <label>Primary_PhonePart3</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Phone</type>
+</CustomField>

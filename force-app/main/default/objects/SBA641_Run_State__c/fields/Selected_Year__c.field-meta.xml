@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Selected_Year__c</fullName>
+    <description>Selected year e.g. 2025</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Selected year e.g. 2025</inlineHelpText>
+    <label>Selected Year</label>
+    <length>10</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

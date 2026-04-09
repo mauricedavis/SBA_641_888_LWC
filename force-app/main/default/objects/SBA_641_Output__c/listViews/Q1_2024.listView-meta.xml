@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Q1_2024</fullName>
+    <columns>NAME</columns>
+    <columns>RECORDTYPE</columns>
+    <columns>Quarter_Year__c</columns>
+    <columns>CREATED_DATE</columns>
+    <columns>LastClientNamePart1__c</columns>
+    <columns>FirstClientNamePart1__c</columns>
+    <columns>BusinessOwnership_Female__c</columns>
+    <columns>Certified8a_ClientIntake__c</columns>
+    <columns>ConductingBusinessOnline_ClientIntake__c</columns>
+    <columns>NumberOfEmployeesExportingBusiness_Part3__c</columns>
+    <columns>NumberOfEmployeesInExportingBusiness__c</columns>
+    <columns>GrossRevenues_ClientAnnualIncomePart2__c</columns>
+    <columns>ProfitLoss_ClientAnnualIncomePart2__c</columns>
+    <columns>LegalEntity_ClientIntake__c</columns>
+    <columns>Certifications_CounselorRecord__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>RECORDTYPE</field>
+        <operation>equals</operation>
+        <value>SBA_641_Output__c.Q1_2024</value>
+    </filters>
+    <label>Q1_2024</label>
+</ListView>

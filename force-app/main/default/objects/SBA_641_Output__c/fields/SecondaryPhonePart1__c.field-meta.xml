@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SecondaryPhonePart1__c</fullName>
+    <description>Contact__r.OtherPhone (CounselingRecord_ClientRequest_PhonePart1_Secondary) - format is 10-digits, no dashes or spaces</description>
+    <inlineHelpText>Contact__r.OtherPhone (CounselingRecord_ClientRequest_PhonePart1_Secondary) - format is 10-digits, no dashes or spaces</inlineHelpText>
+    <label>Secondary_PhonePart1</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Phone</type>
+</CustomField>

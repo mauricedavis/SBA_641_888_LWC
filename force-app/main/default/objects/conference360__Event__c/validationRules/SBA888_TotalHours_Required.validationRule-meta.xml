@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SBA888_TotalHours_Required</fullName>
+    <active>true</active>
+    <description>Prevents Verified from being checked if Total Hours is blank. Required for SBA 888 XML reporting pipeline.</description>
+    <errorConditionFormula>AND(ISCHANGED(Verified__c), Verified__c = TRUE, ISBLANK(Total_Hours__c))</errorConditionFormula>
+    <errorDisplayField>Total_Hours__c</errorDisplayField>
+    <errorMessage>Total Hours is required before marking this Event as Verified. This value is used for SBA 888 XML reporting.</errorMessage>
+</ValidationRule>

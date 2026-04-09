@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Errors__c</fullName>
+    <description>Branch of Service required when military service indicated.</description>
+    <externalId>false</externalId>
+    <formula>IF(
+    NOT(
+        OR(
+            ISPICKVAL(MilitaryStatusClientIntake__c, &quot;Prefer not to say&quot;),
+            ISPICKVAL(MilitaryStatusClientIntake__c, &quot;No military service&quot;)
+        )
+    ),
+    IF(
+        OR(
+            ISBLANK(TEXT(BranchOfService_ClientIntake__c)),
+            NOT(
+                OR(
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Army&quot;),
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Navy&quot;),
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Marine Corps&quot;),
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Coast Guard&quot;),
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Space Force&quot;),
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Air Force&quot;),
+                    ISPICKVAL(BranchOfService_ClientIntake__c, &quot;Prefer not to say&quot;)
+                )
+            )
+        ),
+        &quot;Branch of Service required when military service indicated.&quot;,
+        &quot;&quot;  /* No error if BranchOfService_ClientIntake__c is valid */
+    ),
+    &quot;&quot;  /* No error if MilitaryStatusClientIntake__c does not indicate service */
+)</formula>
+    <inlineHelpText>Branch of Service required when military service indicated.</inlineHelpText>
+    <label>Errors</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

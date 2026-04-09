@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>DateofReportableImpact__c</fullName>
+    <description>For SBA Reporting: Counselor Record &gt; Date of Reportable Impact (date that the business reported impact</description>
+    <inlineHelpText>For SBA Reporting: Counselor Record &gt; Date of Reportable Impact (date that the business reported impact</inlineHelpText>
+    <label>Date of Reportable Impact</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Date</type>
+</CustomField>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>EmailClientRequest__c</fullName>
+    <description>Contact__r.Email (CounselingRecord_ClientRequest_Email)</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Contact__r.Email (CounselingRecord_ClientRequest_Email)</inlineHelpText>
+    <label>Email_ClientRequest</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Email</type>
+    <unique>false</unique>
+</CustomField>

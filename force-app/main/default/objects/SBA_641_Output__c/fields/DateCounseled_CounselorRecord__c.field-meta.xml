@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>DateCounseled_CounselorRecord__c</fullName>
+    <description>Session_Date_Time__c (CounselingRecord_CounselorRecord_DateCounseled)</description>
+    <inlineHelpText>Session_Date_Time__c (CounselingRecord_CounselorRecord_DateCounseled)</inlineHelpText>
+    <label>DateCounseled_CounselorRecord</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Date</type>
+</CustomField>

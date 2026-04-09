@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>EthnicityClientIntake__c</fullName>
+    <description>Contact__r.Hispanic__c (CounselingRecord_ClientIntake_Ethnicity)</description>
+    <inlineHelpText>Contact__r.Hispanic__c (CounselingRecord_ClientIntake_Ethnicity)</inlineHelpText>
+    <label>Ethnicity_ClientIntake</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Hispanic or Latino</fullName>
+                <default>false</default>
+                <label>Hispanic or Latino</label>
+            </value>
+            <value>
+                <fullName>Non Hispanic or Latino</fullName>
+                <default>false</default>
+                <label>Non Hispanic or Latino</label>
+            </value>
+            <value>
+                <fullName>Prefer not to say</fullName>
+                <default>false</default>
+                <label>Prefer not to say</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SessionType_CounselorRecord__c</fullName>
+    <description>Delivery_Type__c (CounselingRecord_CounselorRecord_SessionType)  - NOTE: If Training is selected, additional fields must be included.</description>
+    <inlineHelpText>Delivery_Type__c (CounselingRecord_CounselorRecord_SessionType)  - NOTE: If Training is selected, additional fields must be included.</inlineHelpText>
+    <label>SessionType_CounselorRecord</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetName>Session_Type</valueSetName>
+    </valueSet>
+</CustomField>

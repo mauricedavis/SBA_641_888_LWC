@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>BusinessStartDatePart3__c</fullName>
+    <description>Account__r.Start_Date__c (CounselingRecord_CounselorRecord_BusinessStartDatePart3)</description>
+    <inlineHelpText>Account__r.Start_Date__c (CounselingRecord_CounselorRecord_BusinessStartDatePart3)</inlineHelpText>
+    <label>BusinessStartDatePart3</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Date</type>
+</CustomField>

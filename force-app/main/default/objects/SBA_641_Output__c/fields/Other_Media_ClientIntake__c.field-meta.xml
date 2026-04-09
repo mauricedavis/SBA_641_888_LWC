@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Other_Media_ClientIntake__c</fullName>
+    <description>Contact__r.Referred_by_Other_specify__c (CounselingRecord_ClientIntake_Media_Other) - When &apos;Media&apos; = Other, then this value is required.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Contact__r.Referred_by_Other_specify__c (CounselingRecord_ClientIntake_Media_Other) - When &apos;Media&apos; = Other, then this value is required.</inlineHelpText>
+    <label>Other_Media_ClientIntake</label>
+    <length>255</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
