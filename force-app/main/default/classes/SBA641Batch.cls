@@ -197,12 +197,10 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
         return input;
     }
     
-        public static String translateRace(String race) {
+    public static String translateRace(String race) {
         if (String.isBlank(race)) {
             return null;
         }
-
-        // Handle specific translations
         if ('American Indian or Alaska Native'.equalsIgnoreCase(race)) {
             return 'Native American/Alaska Native';
         }
@@ -212,33 +210,31 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
         if ('Arab or Middle Eastern'.equalsIgnoreCase(race)) {
             return 'Middle Eastern';
         }
-
-        // Return the input value if no translation is applied
         return race;
     }
     
     // Define the accepted list of values
     Set<String> acceptedMediaValues = new Set<String>{
-    'Boots to Business',
-    'Business Owner',
-    'Chamber of Commerce',
-    'Educational Institution',
-    'Internet',
-    'Lender',
-    'Local Economic Development Official',
-    'Magazine/Newspaper',
-    'SBA District',
-    'SBA Web site',
-    'SBDC',
-    'SCORE',
-    'Television/Radio',
-    'USEAC',
-    'VBOC',
-    'VRE',
-    'WBC',
-    'Word of Mouth',
-    'Other Client',
-    'Other'
+        'Boots to Business',
+        'Business Owner',
+        'Chamber of Commerce',
+        'Educational Institution',
+        'Internet',
+        'Lender',
+        'Local Economic Development Official',
+        'Magazine/Newspaper',
+        'SBA District',
+        'SBA Web site',
+        'SBDC',
+        'SCORE',
+        'Television/Radio',
+        'USEAC',
+        'VBOC',
+        'VRE',
+        'WBC',
+        'Word of Mouth',
+        'Other Client',
+        'Other'
     };
         
     // Define the business status values
@@ -248,19 +244,19 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
         'Sold Business'
     };
         
-        // Define a map for Delivery_Type__c to SessionType_CounselorRecord__c conversions
-        Map<String, String> deliveryTypeMap = new Map<String, String>{
-            'Center' => 'Face-to-face',
-            'E-Mail' => 'Online',
-            'Group' => 'Face-to-face',
-            'Mail' => 'Update Only',
-            'Client Site' => 'Face-to-face',
-            'Satellite' => 'Face-to-face',
-            'Telephone' => 'Telephone',
-            'Video' => 'Online',
-            'Webinar' => 'Online',
-            'SMS Text' => 'Update Only'
-        };
+    // Define a map for Delivery_Type__c to SessionType_CounselorRecord__c conversions
+    Map<String, String> deliveryTypeMap = new Map<String, String>{
+        'Center' => 'Face-to-face',
+        'E-Mail' => 'Online',
+        'Group' => 'Face-to-face',
+        'Mail' => 'Update Only',
+        'Client Site' => 'Face-to-face',
+        'Satellite' => 'Face-to-face',
+        'Telephone' => 'Telephone',
+        'Video' => 'Online',
+        'Webinar' => 'Online',
+        'SMS Text' => 'Update Only'
+    };
         
     // Utility method to convert state abbreviations to full state names
     public static String getStateFullName(String stateAbbreviation) {
@@ -272,21 +268,19 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
             'MI' => 'Michigan', 'MN' => 'Minnesota', 'MS' => 'Mississippi', 'MO' => 'Missouri', 'MT' => 'Montana',
             'NE' => 'Nebraska', 'NV' => 'Nevada', 'NH' => 'New Hampshire', 'NJ' => 'New Jersey', 'NM' => 'New Mexico',
             'NY' => 'New York', 'NC' => 'North Carolina', 'ND' => 'North Dakota', 'OH' => 'Ohio', 'OK' => 'Oklahoma',
-            'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'RI' => 'Rhode Island', 'SC' => 'South Carolina', 
-            'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas', 'UT' => 'Utah', 'VT' => 'Vermont', 
+            'OR' => 'Oregon', 'PA' => 'Pennsylvania', 'RI' => 'Rhode Island', 'SC' => 'South Carolina',
+            'SD' => 'South Dakota', 'TN' => 'Tennessee', 'TX' => 'Texas', 'UT' => 'Utah', 'VT' => 'Vermont',
             'VA' => 'Virginia', 'WA' => 'Washington', 'WV' => 'West Virginia', 'WI' => 'Wisconsin', 'WY' => 'Wyoming'
         };
-
         if (stateMap.containsKey(stateAbbreviation)) {
             return stateMap.get(stateAbbreviation);
         } else {
-            return stateAbbreviation;  // Return the abbreviation if no match is found
+            return stateAbbreviation;
         }
     }
 
     // Start method to query the records for the given date range
     public Database.QueryLocator start(Database.BatchableContext bc) {
-        // Full SOQL query to retrieve the relevant records from Session__c
         String query = 'SELECT Case__r.Center_Region_Code__c, ' +
                            'Account__r.EDMIS_Key__c, ' +
                            'Case__r.Contact.FirstName, ' +
@@ -345,7 +339,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                            'Business_Status_for_Session__c, ' +
                            'Language__c, ' +
                            'Language_Other__c, ' +
-            			   'Id, ' +
+                           'Id, ' +
                            'Session_Number__c, ' +
                            'Session_Type__c, ' +
                            'Session_Date__c, ' +
@@ -353,7 +347,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                            'Primary_Consultant__r.LastName, ' +
                            'Primary_Consultant__r.Email, ' +
                            'Primary_Consultant__r.Phone, ' +
-                           'Primary_Consultant__r.Name, ' +  // Ensure this line is added
+                           'Primary_Consultant__r.Name, ' +
                            'Contact_Hours__c, ' +
                            'Prep_Hours__c, ' +
                            'Travel_Hours__c, ' +
@@ -387,8 +381,8 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                            'AND (Case__r.Cumulative_Consulting_Hours__c > 0 OR Total_Training_Hours__c > 0) ' +
                            'AND Case__c != \'\' ' +
                            'AND Account__c != \'\' ' +
-                           'AND Session_Date__c >= :startDate ' +   // Inclusive of the start date
-                           'AND Session_Date__c <= :endDate ' +     // Inclusive of the end date
+                           'AND Session_Date__c >= :startDate ' +
+                           'AND Session_Date__c <= :endDate ' +
                            'AND Session_type__c IN (\'EDMIS Update\', \'Counseling: Initial\', \'Counseling: Follow On\', \'Event Attendance\') ' +
 // Removed 07/28/2025      'AND EDMIS_Overall_Validation__c = TRUE AND Verified__c = FALSE ' +
                            'ORDER BY Session_Sort__c, Session_Date_Time__c, Session_Number__c';
@@ -398,7 +392,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
 
     // Execute method to map and insert records into SBA_641_Output__c
     public void execute(Database.BatchableContext bc, List<Session__c> scope) {
-        processedRecordsCount += scope.size(); // Add count of records in the current batch
+        processedRecordsCount += scope.size();
         List<SBA_641_Output__c> outputRecords = new List<SBA_641_Output__c>();
 
         for (Session__c session : scope) {
@@ -407,157 +401,103 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
             System.debug('Quarter Year Value: ' + varQuarterYear);
             newRecord.Quarter_Year__c = varQuarterYear;
 
-            // Mapping fields from Session__c to SBA_641_Output__c
-
-            // HEADER:  CounselingRecord
+            // HEADER: CounselingRecord
             newRecord.PartnerClientNumber__c = session.Account__r.EDMIS_Key__c;
             newRecord.LocationCode__c = session.Case__r.Center_Region_Code__c;
             newRecord.SessionId__c = session.Id;
 
-            // Start of Section: ClientRequest
+            // ── ClientRequest ─────────────────────────────────────────────────
             newRecord.LastClientNamePart1__c = session.Contact__r.LastName;
             newRecord.FirstClientNamePart1__c = session.Contact__r.FirstName;
             newRecord.EmailClientRequest__c = session.Contact__r.Email;
             newRecord.PrimaryPhonePart1__c = cleanPhoneNumber(session.Contact__r.Phone);
             newRecord.SecondaryPhonePart1__c = cleanPhoneNumber(session.Contact__r.OtherPhone);
             
-            // Sub-Section of ClientRequest: AddressPart1
             newRecord.Street1AddressPart1__c = session.Account__r.BillingStreet;
             newRecord.CityAddressPart1__c = session.Account__r.BillingCity;
             newRecord.StateAddressPart1__c = getStateFullName(session.Account__r.BillingState);
             
-            // Normalize and set CountryAddressPart1__c
             if (session.Account__r.BillingCountry != null) {
-                String normalizedCountry = 'United states'.equalsIgnoreCase(session.Account__r.BillingCountry) 
-                    ? 'United States' 
+                String normalizedCountry = 'United states'.equalsIgnoreCase(session.Account__r.BillingCountry)
+                    ? 'United States'
                     : session.Account__r.BillingCountry;
                 newRecord.CountryAddressPart1__c = normalizedCountry;
             } else {
-                newRecord.CountryAddressPart1__c = null; // Handle null BillingCountry
+                newRecord.CountryAddressPart1__c = null;
             }
             
-            // Trim BillingPostalCode to the first 5 characters for ZipCodeAddressPart1__c
             if (session.Account__r.BillingPostalCode != null && session.Account__r.BillingPostalCode.length() >= 5) {
                 newRecord.ZipCodeAddressPart1__c = session.Account__r.BillingPostalCode.substring(0, 5);
-                    } else {
-                newRecord.ZipCodeAddressPart1__c = session.Account__r.BillingPostalCode;  // Use as is if shorter than 5 characters
+            } else {
+                newRecord.ZipCodeAddressPart1__c = session.Account__r.BillingPostalCode;
             }
             
             newRecord.SurveyAgreement__c = session.Account__r.Share_with_SBA__c;
             
             if (session.Case__r.DateeRFCCompleted__c != null) {
-                // Use Case__r.DateeRFCCompleted__c if it's not null
                 xmlOutput += '<DateClientSignature>' + escapeXml(String.valueOf(session.Case__r.DateeRFCCompleted__c)) + '</DateClientSignature>\n';
             } else {
-                // Default to Case__r.CreatedDate if DateeRFCCompleted__c is null
                 xmlOutput += '<DateClientSignature>' + escapeXml(String.valueOf(session.Case__r.CreatedDate)) + '</DateClientSignature>\n';
             }
 
             newRecord.DateClientSignature__c = (session.Case__r != null && session.Case__r.DateeRFCCompleted__c != null)
-            ? session.Case__r.DateeRFCCompleted__c.date()
-            : (session.Case__r == null || session.Case__r.DateeRFCCompleted__c == null)
-                ? startDate
-                : null;
+                ? session.Case__r.DateeRFCCompleted__c.date()
+                : (session.Case__r == null || session.Case__r.DateeRFCCompleted__c == null)
+                    ? startDate
+                    : null;
 
             newRecord.OnFileClientSignature__c = session.Case__r.eRFC_Complete__c;
-            
-            // End of Section: ClientRequest
-            
-            // Start of Section: ClientIntake
-            
-// Check and convert Race
-if (session.Contact__r.hed__Race__c != null) {
-    String raceValue = session.Contact__r.hed__Race__c;
 
-    // Normalize 'Prefer Not to Say' to 'Prefer not to say'
-    if (raceValue == 'Prefer Not to Say') {
-        raceValue = 'Prefer not to say';
-    }
+            // ── ClientIntake ──────────────────────────────────────────────────
+            if (session.Contact__r.hed__Race__c != null) {
+                String raceValue = session.Contact__r.hed__Race__c;
+                if (raceValue == 'Prefer Not to Say') { raceValue = 'Prefer not to say'; }
+                if (raceValue == 'Arab or Middle Eastern') { raceValue = 'Middle Eastern'; }
+                if (raceValue == 'Other') { raceValue = 'Prefer not to say'; }
+                if (raceValue == 'American Indian or Alaska Native') { raceValue = 'Native American/Alaska Native'; }
+                newRecord.RaceClientIntake__c = raceValue.length() > 80 ? raceValue.substring(0, 80) : raceValue;
+            }
 
-    // Translate 'Arab or Middle Eastern' to 'Middle Eastern'
-    if (raceValue == 'Arab or Middle Eastern') {
-        raceValue = 'Middle Eastern';
-    }
+            if (newRecord.RaceClientIntake__c == 'Prefer to Self-Describe') {
+                if (String.isBlank(newRecord.SelfDescribedRaceClientIntake__c)) {
+                    newRecord.SelfDescribedRaceClientIntake__c = 'Prefer not to say';
+                } else {
+                    String raceValue = newRecord.SelfDescribedRaceClientIntake__c;
+                    if (raceValue.length() > 80) {
+                        newRecord.SelfDescribedRaceClientIntake__c = raceValue.substring(0, 80);
+                    }
+                }
+            } else {
+                newRecord.SelfDescribedRaceClientIntake__c = null;
+            }
 
-    // Translate 'Other' to 'Prefer not to say'
-    if (raceValue == 'Other') {
-        raceValue = 'Prefer not to say';
-    }
-
-    // Translate 'American Indian or Alaska Native' to 'Native American/Alaska Native'
-    if (raceValue == 'American Indian or Alaska Native') {
-        raceValue = 'Native American/Alaska Native';
-    }
-
-    // Truncate the value to 80 characters if necessary
-    newRecord.RaceClientIntake__c = raceValue.length() > 80 
-        ? raceValue.substring(0, 80) 
-        : raceValue;
-}
-
-
-
-// Check if RaceClientIntake__c requires a SelfDescribedRace value
-if (newRecord.RaceClientIntake__c == 'Prefer to Self-Describe') {
-    // Check if SelfDescribedRaceClientIntake__c is blank or null
-    if (String.isBlank(newRecord.SelfDescribedRaceClientIntake__c)) {
-        // Set the value to 'Prefer not to say'
-        newRecord.SelfDescribedRaceClientIntake__c = 'Prefer not to say';
-    } else {
-        // If a value exists, trim it to the first 80 characters if necessary
-        String raceValue = newRecord.SelfDescribedRaceClientIntake__c;
-        if (raceValue.length() > 80) {
-            newRecord.SelfDescribedRaceClientIntake__c = raceValue.substring(0, 80);
-        }
-    }
-} else {
-    // If RaceClientIntake__c is not 'Prefer to Self-Describe', clear the SelfDescribedRace field
-    newRecord.SelfDescribedRaceClientIntake__c = null;
-}
-
-
-            // Ethnicity translation logic
             String originalValue = session.Case__r != null ? session.Case__r.Contact.Hispanic__c : null;
             if (originalValue != null) {
-                String translatedValue = translateEthnicity(originalValue);
-                newRecord.EthnicityClientIntake__c = translatedValue;
+                newRecord.EthnicityClientIntake__c = translateEthnicity(originalValue);
             } else {
                 newRecord.EthnicityClientIntake__c = 'Prefer not to say';
             }
 
-            //newRecord.EthnicityClientIntake__c = session.Contact__r.Hispanic__c;
-            
-// Translation for SexualOrientation_ClientIntake__c
-if (session.Contact__r.Sexual_Orientation__c == 'Non LGBTQ') {
-    newRecord.SexualOrientationClientIntake__c = 'Not LGBTQ';
-} else {
-    newRecord.SexualOrientationClientIntake__c = session.Contact__r.Sexual_Orientation__c;
-}
+            if (session.Contact__r.Sexual_Orientation__c == 'Non LGBTQ') {
+                newRecord.SexualOrientationClientIntake__c = 'Not LGBTQ';
+            } else {
+                newRecord.SexualOrientationClientIntake__c = session.Contact__r.Sexual_Orientation__c;
+            }
+            newRecord.SelfDescribedSexualOrientation__c = session.Contact__r.Sexual_Orientation_Self_Describe__c;
+            if ('Prefer to Self-Describe'.equalsIgnoreCase(newRecord.SexualOrientationClientIntake__c)) {
+                if (String.isBlank(newRecord.SelfDescribedSexualOrientation__c)) {
+                    newRecord.SelfDescribedSexualOrientation__c = 'Prefer not to say';
+                }
+            }
 
-// Set SelfDescribedSexualOrientation__c
-newRecord.SelfDescribedSexualOrientation__c = session.Contact__r.Sexual_Orientation_Self_Describe__c;
-
-// Check if SexualOrientationClientIntake__c = 'Prefer to Self-Describe'
-if ('Prefer to Self-Describe'.equalsIgnoreCase(newRecord.SexualOrientationClientIntake__c)) {
-    // Default SelfDescribedSexualOrientation__c to 'Prefer not to say' if blank/null
-    if (String.isBlank(newRecord.SelfDescribedSexualOrientation__c)) {
-        newRecord.SelfDescribedSexualOrientation__c = 'Prefer not to say';
-    }
-}
-
-
-            // Mapping SexClientIntake__c
             newRecord.SexClientIntake__c = session.Contact__r.Sex__c;
             
-            // Translation for Disability_ClientIntake__c
             if (session.Contact__r.Disabled__c == 'No Reply') {
                 newRecord.DisabilityClientIntake__c = 'Prefer not to say';
-                } else {
-                // Keep 'Yes', 'No', and 'Prefer not to say' as is
+            } else {
                 newRecord.DisabilityClientIntake__c = session.Contact__r.Disabled__c;
             }
             
-            // Map Contact__r.Military__c to MilitaryStatusClientIntake__c with specific translations
             if (session.Contact__r.Military__c != null) {
                 if (session.Contact__r.Military__c == 'Member of Reserve') {
                     newRecord.MilitaryStatusClientIntake__c = 'Member of the Reserve';
@@ -568,137 +508,78 @@ if ('Prefer to Self-Describe'.equalsIgnoreCase(newRecord.SexualOrientationClient
                 } else if (session.Contact__r.Military__c == 'Unknown/Not Stated') {
                     newRecord.MilitaryStatusClientIntake__c = 'No military service';
                 } else {
-            // For allowed values in the picklist, map directly
                     newRecord.MilitaryStatusClientIntake__c = session.Contact__r.Military__c;
                 }
             }
             
-// Explicitly define handling for each MilitaryStatus_ClientIntake__c value
-if (session.Contact__r.Military__c == 'Active Duty') {
-    if (String.isBlank(session.Contact__r.Branch_of_Service__c)) {
-        newRecord.BranchOfService_ClientIntake__c = 'Prefer not to say';
-    } else {
-        newRecord.BranchOfService_ClientIntake__c = session.Contact__r.Branch_of_Service__c;
-    }
-} else if (session.Contact__r.Military__c == 'Member of National Guard') {
-    if (String.isBlank(session.Contact__r.Branch_of_Service__c)) {
-        newRecord.BranchOfService_ClientIntake__c = 'Prefer not to say';
-    } else {
-        newRecord.BranchOfService_ClientIntake__c = session.Contact__r.Branch_of_Service__c;
-    }
-} else if (session.Contact__r.Military__c == 'Member of the Reserve') {
-    if (String.isBlank(session.Contact__r.Branch_of_Service__c)) {
-        newRecord.BranchOfService_ClientIntake__c = 'Prefer not to say';
-    } else {
-        newRecord.BranchOfService_ClientIntake__c = session.Contact__r.Branch_of_Service__c;
-    }
-} else if (session.Contact__r.Military__c == 'Service Disabled Veteran') {
-    if (String.isBlank(session.Contact__r.Branch_of_Service__c)) {
-        newRecord.BranchOfService_ClientIntake__c = 'Prefer not to say';
-    } else {
-        newRecord.BranchOfService_ClientIntake__c = session.Contact__r.Branch_of_Service__c;
-    }
-} else if (session.Contact__r.Military__c == 'Spouse of Military Member') {
-    if (String.isBlank(session.Contact__r.Branch_of_Service__c)) {
-        newRecord.BranchOfService_ClientIntake__c = 'Prefer not to say';
-    } else {
-        newRecord.BranchOfService_ClientIntake__c = session.Contact__r.Branch_of_Service__c;
-    }
-} else if (session.Contact__r.Military__c == 'Veteran') {
-    if (String.isBlank(session.Contact__r.Branch_of_Service__c)) {
-        newRecord.BranchOfService_ClientIntake__c = 'Prefer not to say';
-    } else {
-        newRecord.BranchOfService_ClientIntake__c = session.Contact__r.Branch_of_Service__c;
-    }
-} else if (session.Contact__r.Military__c == 'No military service') {
-    newRecord.BranchOfService_ClientIntake__c = null; // Clear field for "No military service"
-} else if (session.Contact__r.Military__c == 'Prefer not to say') {
-    newRecord.BranchOfService_ClientIntake__c = null; // Clear field for "Prefer not to say"
-}
+            if (session.Contact__r.Military__c == 'Active Duty') {
+                newRecord.BranchOfService_ClientIntake__c = String.isBlank(session.Contact__r.Branch_of_Service__c) ? 'Prefer not to say' : session.Contact__r.Branch_of_Service__c;
+            } else if (session.Contact__r.Military__c == 'Member of National Guard') {
+                newRecord.BranchOfService_ClientIntake__c = String.isBlank(session.Contact__r.Branch_of_Service__c) ? 'Prefer not to say' : session.Contact__r.Branch_of_Service__c;
+            } else if (session.Contact__r.Military__c == 'Member of the Reserve') {
+                newRecord.BranchOfService_ClientIntake__c = String.isBlank(session.Contact__r.Branch_of_Service__c) ? 'Prefer not to say' : session.Contact__r.Branch_of_Service__c;
+            } else if (session.Contact__r.Military__c == 'Service Disabled Veteran') {
+                newRecord.BranchOfService_ClientIntake__c = String.isBlank(session.Contact__r.Branch_of_Service__c) ? 'Prefer not to say' : session.Contact__r.Branch_of_Service__c;
+            } else if (session.Contact__r.Military__c == 'Spouse of Military Member') {
+                newRecord.BranchOfService_ClientIntake__c = String.isBlank(session.Contact__r.Branch_of_Service__c) ? 'Prefer not to say' : session.Contact__r.Branch_of_Service__c;
+            } else if (session.Contact__r.Military__c == 'Veteran') {
+                newRecord.BranchOfService_ClientIntake__c = String.isBlank(session.Contact__r.Branch_of_Service__c) ? 'Prefer not to say' : session.Contact__r.Branch_of_Service__c;
+            } else if (session.Contact__r.Military__c == 'No military service') {
+                newRecord.BranchOfService_ClientIntake__c = null;
+            } else if (session.Contact__r.Military__c == 'Prefer not to say') {
+                newRecord.BranchOfService_ClientIntake__c = null;
+            }
 
-// No fallback logic for undefined or unexpected statuses
+            // Media
+            String hearAboutUsValue = session.Contact__r.How_did_you_hear_about_us__c;
+            String hearAboutUsDetails = session.Contact__r.How_did_you_hear_about_us_details__c;
+            String mediaSource = session.Contact__r.How_did_you_hear_about_us__c;
+            if ('EDC'.equalsIgnoreCase(mediaSource)) {
+                newRecord.Media_ClientIntake__c = 'Other Client';
+            } else if ('I was referred by someone'.equalsIgnoreCase(mediaSource)) {
+                newRecord.Media_ClientIntake__c = 'Word of Mouth';
+            } else {
+                newRecord.Media_ClientIntake__c = mediaSource;
+            }
+            if (acceptedMediaValues.contains(newRecord.Media_ClientIntake__c)) {
+                newRecord.Other_Media_ClientIntake__c = null;
+            } else {
+                newRecord.Media_ClientIntake__c = 'Other';
+                newRecord.Other_Media_ClientIntake__c = hearAboutUsValue;
+                if (!String.isBlank(hearAboutUsDetails)) {
+                    newRecord.Other_Media_ClientIntake__c += ' - ' + hearAboutUsDetails;
+                }
+                if (!String.isBlank(newRecord.Other_Media_ClientIntake__c) && newRecord.Other_Media_ClientIntake__c.length() > 80) {
+                    newRecord.Other_Media_ClientIntake__c = newRecord.Other_Media_ClientIntake__c.substring(0, 80);
+                }
+            }
+            if ('Internet'.equalsIgnoreCase(newRecord.Media_ClientIntake__c)) {
+                newRecord.Internet_Media_ClientIntake__c = !String.isBlank(newRecord.Other_Media_ClientIntake__c)
+                    ? newRecord.Other_Media_ClientIntake__c.trim()
+                    : 'Undetermined';
+            }
 
-
-
-
-            // Sub-Section of ClientIntake: Media
-
-// Get the values from Contact__r
-String hearAboutUsValue = session.Contact__r.How_did_you_hear_about_us__c;
-String hearAboutUsDetails = session.Contact__r.How_did_you_hear_about_us_details__c;
-
-// Translation for Media_ClientIntake__c
-String mediaSource = session.Contact__r.How_did_you_hear_about_us__c;
-if ('EDC'.equalsIgnoreCase(mediaSource)) {
-    newRecord.Media_ClientIntake__c = 'Other Client';
-} else if ('I was referred by someone'.equalsIgnoreCase(mediaSource)) {
-    newRecord.Media_ClientIntake__c = 'Word of Mouth';
-} else {
-    newRecord.Media_ClientIntake__c = mediaSource;
-}
-
-// Validate Media_ClientIntake__c against accepted values or default to 'Other'
-if (acceptedMediaValues.contains(newRecord.Media_ClientIntake__c)) {
-    // If valid, keep the value and clear Other_Media_ClientIntake__c
-    newRecord.Other_Media_ClientIntake__c = null;
-} else {
-    // If not in the list, set Media_ClientIntake__c to "Other"
-    newRecord.Media_ClientIntake__c = 'Other';
-
-    // Populate Other_Media_ClientIntake__c with details
-    newRecord.Other_Media_ClientIntake__c = hearAboutUsValue;
-    if (!String.isBlank(hearAboutUsDetails)) {
-        newRecord.Other_Media_ClientIntake__c += ' - ' + hearAboutUsDetails;
-    }
-
-    // Trim Other_Media_ClientIntake__c to 80 characters if necessary
-    if (!String.isBlank(newRecord.Other_Media_ClientIntake__c) && newRecord.Other_Media_ClientIntake__c.length() > 80) {
-        newRecord.Other_Media_ClientIntake__c = newRecord.Other_Media_ClientIntake__c.substring(0, 80);
-    }
-}
-
-// Handle Internet_Media_ClientIntake__c when Media_ClientIntake__c = 'Internet'
-if ('Internet'.equalsIgnoreCase(newRecord.Media_ClientIntake__c)) {
-    if (!String.isBlank(newRecord.Other_Media_ClientIntake__c)) {
-        // Set Internet_Media_ClientIntake__c to the value of Other_Media_ClientIntake__c
-        newRecord.Internet_Media_ClientIntake__c = newRecord.Other_Media_ClientIntake__c.trim();
-    } else {
-        // Default to 'Undetermined' if Other_Media_ClientIntake__c is blank or null
-        newRecord.Internet_Media_ClientIntake__c = 'Undetermined';
-    }
-}
-
-            
-            // Check Business_Status_for_Session__c and set CurrentlyInBusiness_ClientIntake__c
             if (notInBusinessStatuses.contains(session.Business_Status_for_Session__c)) {
                 newRecord.CurrentlyInBusiness_ClientIntake__c = 'No';
             } else if (session.Business_Status_for_Session__c == 'In Business') {
                 newRecord.CurrentlyInBusiness_ClientIntake__c = 'Yes';
             } else if (session.Account__r.In_Business__c != null) {
-                // Use Account__r.In_Business__c if Business_Status_for_Session__c is blank or null
                 newRecord.CurrentlyInBusiness_ClientIntake__c = session.Account__r.In_Business__c ? 'Yes' : 'No';
             } else {
-                // Default to 'No' if neither field has a value
                 newRecord.CurrentlyInBusiness_ClientIntake__c = 'No';
             }
 
-            
-            // Truncate Account Name to 80 characters for CompanyName_ClientIntake__c
             String accountName = session.Account__r.Name;
-            if (accountName != null && accountName.length() > 80) {
-                newRecord.CompanyName_ClientIntake__c = accountName.substring(0, 80);
-                } else {
-                newRecord.CompanyName_ClientIntake__c = accountName;
-            }
+            newRecord.CompanyName_ClientIntake__c = (accountName != null && accountName.length() > 80)
+                ? accountName.substring(0, 80) : accountName;
             
-            // Define the mapping for Account__r.Industry to BusinessType_ClientIntake__c
             Map<String, String> industryMapping = new Map<String, String>{
                 '11 Agriculture, Forestry Fishing and Hunting' => 'Agriculture, Forestry, Fishing and Hunting',
                 '11 Agriculture, Forestry, Fishing and Hunting' => 'Agriculture, Forestry, Fishing and Hunting',
                 '72 Accommodation and Food Services' => 'Accommodation and Food Services',
                 '56 Administrative and Support' => 'Administrative and Support',
                 '71 Arts, Entertainment, and Recreation' => 'Arts, Entertainment, and Recreation',
-                '71 Arts, Entertainment and Recreation' => 'Arts, Entertainment, and Recreation',    
+                '71 Arts, Entertainment and Recreation' => 'Arts, Entertainment, and Recreation',
                 '23 Construction' => 'Construction',
                 '61 Educational Services' => 'Educational Services',
                 '52 Finance and Insurance' => 'Finance and Insurance',
@@ -726,132 +607,92 @@ if ('Internet'.equalsIgnoreCase(newRecord.Media_ClientIntake__c)) {
                 'Real Estate and Rental and Leasing' => 'Real Estate and Rental and Leasing'
             };
 
-// Check if the Account__r.Industry has a matching translation in the map
-if (industryMapping.containsKey(session.Account__r.Industry)) {
-    newRecord.BusinessType_ClientIntake__c = industryMapping.get(session.Account__r.Industry);
-} else {
-    // Normalize raw value before assigning to restricted picklist
-    String rawIndustry = session.Account__r.Industry;
-    if (String.isNotBlank(rawIndustry)) {
-        rawIndustry = rawIndustry.replace('&amp;', '&').replace('&amp', '&');
-        rawIndustry = rawIndustry.replace('Waste Management & Remediation Services', 
-                                          'Waste Management and Remediation Services');
-        rawIndustry = rawIndustry.replace('Waste Management &amp; Remediation Services',
-                                          'Waste Management and Remediation Services');
-    }
-    newRecord.BusinessType_ClientIntake__c = rawIndustry;
-}
+            if (industryMapping.containsKey(session.Account__r.Industry)) {
+                newRecord.BusinessType_ClientIntake__c = industryMapping.get(session.Account__r.Industry);
+            } else {
+                String rawIndustry = session.Account__r.Industry;
+                if (String.isNotBlank(rawIndustry)) {
+                    rawIndustry = rawIndustry.replace('&amp;', '&').replace('&amp', '&');
+                    rawIndustry = rawIndustry.replace('Waste Management & Remediation Services', 'Waste Management and Remediation Services');
+                    rawIndustry = rawIndustry.replace('Waste Management &amp; Remediation Services', 'Waste Management and Remediation Services');
+                }
+                newRecord.BusinessType_ClientIntake__c = rawIndustry;
+            }
+            if (String.isBlank(newRecord.BusinessType_ClientIntake__c) && 'Yes'.equalsIgnoreCase(newRecord.CurrentlyInBusiness_ClientIntake__c)) {
+                newRecord.BusinessType_ClientIntake__c = 'Other Services (except Public Administration)';
+            }
 
-// Check if BusinessType_ClientIntake__c is blank/null and CurrentlyInBusiness_ClientIntake__c = 'Yes'
-if (String.isBlank(newRecord.BusinessType_ClientIntake__c) 
-    && 'Yes'.equalsIgnoreCase(newRecord.CurrentlyInBusiness_ClientIntake__c)) {
-    newRecord.BusinessType_ClientIntake__c = 'Other Services (except Public Administration)';
-}
-
-
-            // FIX: Cap BusinessOwnership_Female__c at 100 - source data can exceed field limit of 999
-            Decimal femaleOwnership = session.Account__r.Female_Ownership__c; newRecord.BusinessOwnership_Female__c = (femaleOwnership == null) ? 0 : Math.min(femaleOwnership, 100);
+            // FIX: Cap BusinessOwnership_Female__c at 100
+            Decimal femaleOwnership = session.Account__r.Female_Ownership__c;
+            newRecord.BusinessOwnership_Female__c = (femaleOwnership == null) ? 0 : Math.min(femaleOwnership, 100);
             
-            // Translate boolean to "Yes"/"No" for ConductingBusinessOnline_ClientIntake__c
             if (session.Account__r.Online_Presence__c == true) {
                 newRecord.ConductingBusinessOnline_ClientIntake__c = 'Yes';
             } else if (session.Account__r.Online_Presence__c == false) {
                 newRecord.ConductingBusinessOnline_ClientIntake__c = 'No';
             }
 
-            //newRecord.Certified8a_ClientIntake__c = String.valueOf(session.Account__r.X8_a_Certified__c); // Replaced with translation below
-            // Translate boolean to "Yes"/"No" for Certified8a_ClientIntake__c
             if (session.Account__r.X8_a_Certified__c == true) {
                 newRecord.Certified8a_ClientIntake__c = 'Yes';
             } else if (session.Account__r.X8_a_Certified__c == false) {
                 newRecord.Certified8a_ClientIntake__c = 'No';
             }
 
-            // Set TotalNumberofEmployees_ClientIntake__c and NumberOfEmployeesInExportingBusiness__c
             newRecord.TotalNumberofEmployees_ClientIntake__c = session.Account__r.Total_employees__c;
             newRecord.NumberOfEmployeesInExportingBusiness__c = session.Account__r.Export_Employees__c;
-
-            // Check if NumberOfEmployeesInExportingBusiness__c is greater than TotalNumberofEmployees_ClientIntake__c
-            if (newRecord.NumberOfEmployeesInExportingBusiness__c != null 
+            if (newRecord.NumberOfEmployeesInExportingBusiness__c != null
                 && newRecord.TotalNumberofEmployees_ClientIntake__c != null
                 && newRecord.NumberOfEmployeesInExportingBusiness__c > newRecord.TotalNumberofEmployees_ClientIntake__c) {
                 newRecord.TotalNumberofEmployees_ClientIntake__c = newRecord.NumberOfEmployeesInExportingBusiness__c + 1;
             }
             
-            // Sub-Section of ClientIntake: ClientAnnualIncomePart2
             newRecord.GrossRevenues_ClientAnnualIncomePart2__c = session.Account__r.AnnualRevenue;
             newRecord.ProfitLoss_ClientAnnualIncomePart2__c = session.Account__r.Annual_PL__c;
             newRecord.ExportGrossRevenuesOrSales__c = session.Account__r.Export_Sales__c;
             
-            // Mapping LegalEntity_ClientIntake__c with allowed values check
             String ownershipValue = session.Account__r.Ownership;
             if (allowedLegalEntities.contains(ownershipValue)) {
                 newRecord.LegalEntity_ClientIntake__c = ownershipValue;
             } else {
-                newRecord.LegalEntity_ClientIntake__c = 'Other';  // Set to 'Other' if not in allowed values
+                newRecord.LegalEntity_ClientIntake__c = 'Other';
             }
-            
-            // Check if LegalEntity_ClientIntake__c is 'Other'
             if (newRecord.LegalEntity_ClientIntake__c == 'Other') {
-                // Check if LegalEntity_Other_ClientIntake__c is blank or null
                 if (String.isBlank(session.Account__r.Other_Entity_Type__c)) {
-                    // Set default value to 'Undetermined' if no value is provided
                     newRecord.LegalEntity_Other_ClientIntake__c = 'Undetermined';
                 } else {
-                // Set the value for LegalEntity_Other_ClientIntake__c with truncation to 80 characters if necessary
                     newRecord.LegalEntity_Other_ClientIntake__c = session.Account__r.Other_Entity_Type__c.length() > 80
-                    ? session.Account__r.Other_Entity_Type__c.substring(0, 80)
-                    : session.Account__r.Other_Entity_Type__c;
+                        ? session.Account__r.Other_Entity_Type__c.substring(0, 80)
+                        : session.Account__r.Other_Entity_Type__c;
                 }
             }
             
-            // Assign value to Rural_vs_Urban
             newRecord.Rural_vs_Urban_ClientIntake__c = 'Undetermined';
-            //FIPS_Code placeholder...
 
-            // Apply mapping for Area_of_Counseling__r
             String areaOfCounseling = session.Area_of_Counseling__c;
             if (counselingMapping.containsKey(areaOfCounseling)) {
                 newRecord.CounselingSeeking_ClientIntake__c = counselingMapping.get(areaOfCounseling);
             } else {
-                // Set default or handle if Area_of_Counseling__r is not in the map
                 newRecord.CounselingSeeking_ClientIntake__c = 'Other';
-            }            
-
-            // Check if CounselingSeeking_ClientIntake__c is 'Other'
+            }
             if (newRecord.CounselingSeeking_ClientIntake__c == 'Other') {
                 newRecord.CounselingSeekingOther_ClientIntake__c = 'Undetermined';
             } else {
-                newRecord.CounselingSeekingOther_ClientIntake__c = null; // Clear the field if not 'Other'
+                newRecord.CounselingSeekingOther_ClientIntake__c = null;
             }
             
-// Translate and set ExportCountries_ClientIntake__c
-String exportCountries = session.Account__r.Export_Countries__c;
+            String exportCountries = session.Account__r.Export_Countries__c;
+            if (String.isNotBlank(exportCountries)) {
+                List<String> countries = exportCountries.split(';');
+                for (Integer i = 0; i < countries.size(); i++) {
+                    if ('Hong Kong'.equalsIgnoreCase(countries[i].trim())) { countries[i] = 'China'; }
+                }
+                newRecord.ExportCountries_ClientIntake__c = toCamelCaseCountries(String.join(countries, '; '));
+            } else {
+                newRecord.ExportCountries_ClientIntake__c = exportCountries;
+            }
 
-// Check if ExportCountries is not blank and process the values
-if (String.isNotBlank(exportCountries)) {
-    List<String> countries = exportCountries.split(';');
-    for (Integer i = 0; i < countries.size(); i++) {
-        if ('Hong Kong'.equalsIgnoreCase(countries[i].trim())) {
-            // Translate 'Hong Kong' to 'China'
-            countries[i] = 'China';
-        }
-    }
-    // Convert the list of countries to camel case
-    newRecord.ExportCountries_ClientIntake__c = toCamelCaseCountries(String.join(countries, '; '));
-} else {
-    // Retain original value if blank/null
-    newRecord.ExportCountries_ClientIntake__c = exportCountries;
-}
-
-            
-            // End of Section: ClientIntake
-          
-            // Start of Section:  CounselorRecord
-            //newRecord.PartnerSessionNumber_Counselor__c = String.valueOf(session.Id);
+            // ── CounselorRecord ───────────────────────────────────────────────
             newRecord.PartnerSessionNumber_Counselor__c = session.Id;
-            
-            //FundingSource (placeholder)
             newRecord.DateCounseled_CounselorRecord__c = session.Session_Date__c;
             newRecord.LastClientNamePart3__c = session.Contact__r.LastName;
             newRecord.FirstClientNamePart3__c = session.Contact__r.FirstName;
@@ -859,198 +700,144 @@ if (String.isNotBlank(exportCountries)) {
             newRecord.Primary_PhonePart3__c = cleanPhoneNumber(session.Contact__r.Phone);
             newRecord.Secondary_PhonePart3__c = cleanPhoneNumber(session.Contact__r.OtherPhone);
             
-            // Sub-Section of CounselorRecord: AddressPart3
             newRecord.Street1_AddressPart3__c = session.Account__r.BillingStreet;
             newRecord.City_AddressPart3__c = session.Account__r.BillingCity;
             newRecord.State_AddressPart3__c = getStateFullName(session.Account__r.BillingState);
-            
-            // Normalize and set Country_AddressPart3__c
             if (session.Account__r.BillingCountry != null) {
-                String normalizedCountry = 'United states'.equalsIgnoreCase(session.Account__r.BillingCountry) 
-                    ? 'United States' 
-                    : session.Account__r.BillingCountry;
+                String normalizedCountry = 'United states'.equalsIgnoreCase(session.Account__r.BillingCountry)
+                    ? 'United States' : session.Account__r.BillingCountry;
                 newRecord.Country_AddressPart3__c = normalizedCountry;
             } else {
-                newRecord.Country_AddressPart3__c = null; // Handle null BillingCountry
+                newRecord.Country_AddressPart3__c = null;
             }
-            
-            //Postal Code (placeholder - part 3)
-            //State or Province (placeholder - part 3)                
-
-            // Trim BillingPostalCode to the first 5 characters for ZipCodeAddressPart3__c
             if (session.Account__r.BillingPostalCode != null && session.Account__r.BillingPostalCode.length() >= 5) {
                 newRecord.ZipCode_AddressPart3__c = session.Account__r.BillingPostalCode.substring(0, 5);
-                    } else {
-                newRecord.ZipCode_AddressPart3__c = session.Account__r.BillingPostalCode;  // Use as is if shorter than 5 characters
+            } else {
+                newRecord.ZipCode_AddressPart3__c = session.Account__r.BillingPostalCode;
             }
             
-// Check Business_Status_for_Session__c and set VerifiedToBeInBusiness_CounselorRecord__c
-if (notInBusinessStatuses.contains(session.Business_Status_for_Session__c)) {
-    newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'No';
-} else if (session.Business_Status_for_Session__c == 'In Business') {
-    newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'Yes';
-} else if (session.Account__r.In_Business__c != null) {
-    // Use Account__r.In_Business__c if Business_Status_for_Session__c is blank or null
-    newRecord.VerifiedToBeInBusiness_CounselorRecord__c = session.Account__r.In_Business__c ? 'Yes' : 'No';
-} else {
-    // Default to 'No' if neither field has a value
-    newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'No';
-}
+            if (notInBusinessStatuses.contains(session.Business_Status_for_Session__c)) {
+                newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'No';
+            } else if (session.Business_Status_for_Session__c == 'In Business') {
+                newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'Yes';
+            } else if (session.Account__r.In_Business__c != null) {
+                newRecord.VerifiedToBeInBusiness_CounselorRecord__c = session.Account__r.In_Business__c ? 'Yes' : 'No';
+            } else {
+                newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'No';
+            }
+            if ('Yes'.equalsIgnoreCase(newRecord.ReportableImpact__c) &&
+                (String.isBlank(newRecord.VerifiedToBeInBusiness_CounselorRecord__c) ||
+                 'No'.equalsIgnoreCase(newRecord.VerifiedToBeInBusiness_CounselorRecord__c))) {
+                newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'Yes';
+            }
 
-// Ensure VerifiedToBeInBusiness_CounselorRecord__c is set to "Yes" if ReportableImpact__c = "Yes"
-if ('Yes'.equalsIgnoreCase(newRecord.ReportableImpact__c) &&
-    (String.isBlank(newRecord.VerifiedToBeInBusiness_CounselorRecord__c) || 
-     'No'.equalsIgnoreCase(newRecord.VerifiedToBeInBusiness_CounselorRecord__c))) {
-    newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'Yes';
-}
-
-
-// Safely get the value of Impact__r.New_Business__c and conditionally set ReportableImpact__c
-if (session.Impact__r != null && session.Impact__r.New_Business__c == true) {
-    // Set Reportable Impact to 'Yes' if Impact__r.New_Business__c is true
-    newRecord.ReportableImpact__c = 'Yes';
-    // Set Date of Reportable Impact to Impact__r.CloseDate
-    newRecord.DateofReportableImpact__c = session.Impact__r.CloseDate;
-} else {
-    // Otherwise, set Reportable Impact to 'No' and clear the Date of Reportable Impact
-    newRecord.ReportableImpact__c = 'No';
-    newRecord.DateofReportableImpact__c = null;
-}
+            if (session.Impact__r != null && session.Impact__r.New_Business__c == true) {
+                newRecord.ReportableImpact__c = 'Yes';
+                newRecord.DateofReportableImpact__c = session.Impact__r.CloseDate;
+            } else {
+                newRecord.ReportableImpact__c = 'No';
+                newRecord.DateofReportableImpact__c = null;
+            }
 
             newRecord.CurrentlyExporting_CounselorRecord_Part3__c = session.Account__r.Exporter__c;
             
-            //newRecord.BusinessStartDatePart3__c = session.Account__r.Start_Date__c;
-            // Check if CurrentlyInBusiness_ClientIntake__c is 'Yes'
             if (newRecord.CurrentlyInBusiness_ClientIntake__c == 'Yes') {
-                // Set BusinessStartDatePart3__c to Account__r.Start_Date__c if it exists
                 if (session.Account__r.Start_Date__c != null) {
                     newRecord.BusinessStartDatePart3__c = session.Account__r.Start_Date__c;
-                } 
-                // If Account__r.Start_Date__c is null, check Business_Status_for_Session__c for a value
-                else if (!String.isBlank(session.Business_Status_for_Session__c) && session.Business_Status_for_Session__c.contains('In Business')) {
-                    // Use a default fallback date, like today or another meaningful date
-                    newRecord.BusinessStartDatePart3__c = Date.today(); // Replace Date.today() if a specific fallback is needed
-                } 
-                // If neither has a valid value, set the field to null
-                else {
+                } else if (!String.isBlank(session.Business_Status_for_Session__c) && session.Business_Status_for_Session__c.contains('In Business')) {
+                    newRecord.BusinessStartDatePart3__c = Date.today();
+                } else {
                     newRecord.BusinessStartDatePart3__c = null;
                 }
             } else {
-                // If CurrentlyInBusiness_ClientIntake__c is not 'Yes', ensure BusinessStartDatePart3__c is null
                 newRecord.BusinessStartDatePart3__c = null;
             }
 
-            // Assign initial values from the session
             newRecord.TotalNumberOfEmployees_CounselorRecord__c = session.Account__r.Total_employees__c;
             newRecord.NumberOfEmployeesExportingBusiness_Part3__c = session.Account__r.Export_Employees__c;
-            // Check and update TotalNumberOfEmployees_CounselorRecord__c if necessary
             if (newRecord.NumberOfEmployeesExportingBusiness_Part3__c != null &&
                 newRecord.TotalNumberOfEmployees_CounselorRecord__c != null &&
-                newRecord.NumberOfEmployeesExportingBusiness_Part3__c > newRecord.TotalNumberOfEmployees_CounselorRecord__c) 
-            {
+                newRecord.NumberOfEmployeesExportingBusiness_Part3__c > newRecord.TotalNumberOfEmployees_CounselorRecord__c) {
                 newRecord.TotalNumberOfEmployees_CounselorRecord__c = newRecord.NumberOfEmployeesExportingBusiness_Part3__c + 1;
             }
             
-            // Sub-section of CounselorRecord: ClientAnnualIncomePart3
             newRecord.GrossRevenues_ClientAnnualIncomePart3__c = session.Account__r.AnnualRevenue;
             newRecord.ProfitLoss_ClientAnnualIncomePart3__c = session.Account__r.Annual_PL__c;
             newRecord.ExportGrossRevenuesOrSales_Part3__c = session.Account__r.Export_Sales__c;
-            // Translate boolean to "Yes"/"No" for GrowthIndicator_ClientAnnualIncomePart3__c
             if (session.Account__r.Growth_Client__c == true) {
                 newRecord.GrowthIndicator_ClientAnnualIncomePart3__c = 'Yes';
             } else if (session.Account__r.Growth_Client__c == false) {
                 newRecord.GrowthIndicator_ClientAnnualIncomePart3__c = 'No';
             }
             
-            // Sub-section of CounselorRecord: ResourcePartnerServiceContributed
-            newRecord.SBALoanAmount_CounselorRecord__c = session.Impact__r.SBA_Loan_Amount__c;
-            newRecord.NonSBALoanAmount_CounselorRecord__c = session.Impact__r.Loan_Obtained_Amount__c;
-            newRecord.EquityCapitalReceived_CounselorRecord__c = session.Impact__r.Other_Amount__c;
-            //SBA Loan Amount Txn Number - Check the value of SBALoanAmount_CounselorRecord__c
-            if (newRecord.SBALoanAmount_CounselorRecord__c != null && newRecord.SBALoanAmount_CounselorRecord__c > 0) {
-                // If SBALoanAmount_CounselorRecord__c > 0, set SBALoanAmountTxnNmbCounselorRecord__c to 1
-                newRecord.SBALoanAmountTxnNmbCounselorRecord__c = 1;
+            // ── ResourcePartnerServiceContributed ─────────────────────────────
+            // FIX (2026-04-20): Capital contribution fields must only be populated
+            // for 'EDMIS Update' sessions, which represent verified Impact records.
+            // Non-EDMIS sessions (Counseling: Initial, Follow On, Event Attendance)
+            // must never carry capital values -- doing so double-counts capital in
+            // the 641 XML output and overstates totals vs. verified Impact Capital
+            // Source (OpportunityLineItem) records by approximately 2x.
+            if (session.Session_Type__c == 'EDMIS Update') {
+                newRecord.SBALoanAmount_CounselorRecord__c         = session.Impact__r.SBA_Loan_Amount__c;
+                newRecord.NonSBALoanAmount_CounselorRecord__c      = session.Impact__r.Loan_Obtained_Amount__c;
+                newRecord.EquityCapitalReceived_CounselorRecord__c = session.Impact__r.Other_Amount__c;
+                newRecord.SBALoanAmountTxnNmbCounselorRecord__c =
+                    (newRecord.SBALoanAmount_CounselorRecord__c != null && newRecord.SBALoanAmount_CounselorRecord__c > 0) ? 1 : 0;
+                newRecord.NonSBALoanAmountTxnNmbCounselorRecord__c =
+                    (newRecord.NonSBALoanAmount_CounselorRecord__c != null && newRecord.NonSBALoanAmount_CounselorRecord__c > 0) ? 1 : 0;
+                newRecord.EquityCapitalReceivedTxnNmbCounselorRec__c =
+                    (newRecord.EquityCapitalReceived_CounselorRecord__c != null && newRecord.EquityCapitalReceived_CounselorRecord__c > 0) ? 1 : 0;
             } else {
-                // Otherwise, set SBALoanAmountTxnNmbCounselorRecord__c to 0
-                newRecord.SBALoanAmountTxnNmbCounselorRecord__c = 0;
+                // Non-EDMIS sessions: zero out all capital and transaction number fields
+                newRecord.SBALoanAmount_CounselorRecord__c             = 0;
+                newRecord.NonSBALoanAmount_CounselorRecord__c          = 0;
+                newRecord.EquityCapitalReceived_CounselorRecord__c     = 0;
+                newRecord.SBALoanAmountTxnNmbCounselorRecord__c        = 0;
+                newRecord.NonSBALoanAmountTxnNmbCounselorRecord__c     = 0;
+                newRecord.EquityCapitalReceivedTxnNmbCounselorRec__c   = 0;
             }
 
-            //Non-SBA Loan Amount Txn Number - Check the value of NonSBALoanAmount_CounselorRecord__c
-            if (newRecord.NonSBALoanAmount_CounselorRecord__c != null && newRecord.NonSBALoanAmount_CounselorRecord__c > 0) {
-                // If NonSBALoanAmount_CounselorRecord__c > 0, set NonSBALoanAmountTxnNmbCounselorRecord__c to 1
-                newRecord.NonSBALoanAmountTxnNmbCounselorRecord__c = 1;
-            } else {
-                // Otherwise, set NonSBALoanAmountTxnNmbCounselorRecord__c to 0
-                newRecord.NonSBALoanAmountTxnNmbCounselorRecord__c = 0;
-            }
-
-            //Equity Capital Received Txn Number // Check the value of EquityCapitalReceived_CounselorRecord__c
-            if (newRecord.EquityCapitalReceived_CounselorRecord__c != null && newRecord.EquityCapitalReceived_CounselorRecord__c > 0) {
-                // If EquityCapitalReceived_CounselorRecord__c > 0, set EquityCapitalReceivedTxnNmbCounselorRec__c to 1
-                newRecord.EquityCapitalReceivedTxnNmbCounselorRec__c = 1;
-            } else {
-                // Otherwise, set EquityCapitalReceivedTxnNmbCounselorRec__c to 0
-                newRecord.EquityCapitalReceivedTxnNmbCounselorRec__c = 0;
-            }
-
-            //Number of Contracts Received (placeholder)
-            
-            // Set Certifications_CounselorRecord__c based on Hub_Zone__c and X8_a_Certified__c
+            // Certifications
             if (session.Account__r.Hub_Zone__c == true) {
                 newRecord.Certifications_CounselorRecord__c = 'Hubzones';
-                } 
+            }
             if (session.Account__r.X8_a_Certified__c == true) {
-            // If Hub_Zone__c was also true, combine values if multiple values are allowed
-            if (newRecord.Certifications_CounselorRecord__c != null && newRecord.Certifications_CounselorRecord__c != 'Hubzones') {
-                newRecord.Certifications_CounselorRecord__c += '; 8(a)';  // Adjust as needed for your format
+                if (newRecord.Certifications_CounselorRecord__c != null && newRecord.Certifications_CounselorRecord__c != 'Hubzones') {
+                    newRecord.Certifications_CounselorRecord__c += '; 8(a)';
                 } else {
-                newRecord.Certifications_CounselorRecord__c = '8(a)';
+                    newRecord.Certifications_CounselorRecord__c = '8(a)';
                 }
             }
             
-            //SBA Financial Assistance (placeholder)
-            //newRecord.CounselingProvided_CounselorRecord__c = session.Area_of_Counseling__c;  // Replace with translation below
-            //newRecord.CounselingSeeking_ClientIntake__c = session.Area_of_Counseling__c;  // Replacing with translation values below
-            // Apply mapping for Area_of_Counseling__r
             String areaOfCounseling2 = session.Area_of_Counseling__c;
             if (counselingMapping.containsKey(areaOfCounseling2)) {
                 newRecord.CounselingProvided_CounselorRecord__c = counselingMapping.get(areaOfCounseling2);
             } else {
-                // Set default or handle if Area_of_Counseling__r is not in the map
                 newRecord.CounselingProvided_CounselorRecord__c = 'Other';
             }
-            
-            // Determine the CounselingProvided_CounselorRecord__c value
             if (counselingMapping.containsKey(session.Area_of_Counseling__c)) {
                 newRecord.CounselingProvided_CounselorRecord__c = counselingMapping.get(session.Area_of_Counseling__c);
             } else {
                 newRecord.CounselingProvided_CounselorRecord__c = 'Other';
             }
-
-            // Check if CounselingProvided_CounselorRecord__c is 'Other' and set CounselingProvidedOther_CounselorRecord__c accordingly
             if (newRecord.CounselingProvided_CounselorRecord__c == 'Other') {
                 if (String.isBlank(newRecord.CounselingProvidedOtherCounselorRecord__c)) {
                     newRecord.CounselingProvidedOtherCounselorRecord__c = 'Undetermined';
                 }
             }
             
-//Check & translate Referred Client & Referred Client
-newRecord.ReferredClient_CounselorRecord__c = session.Referral_To__c;
-newRecord.ReferredClientOther_CounselorRecord__c = session.Referral_To_Other__c;
-
-// Check if ReferredClientOther_CounselorRecord__c has a value and ReferredClient_CounselorRecord__c is blank/null
-if (!String.isBlank(newRecord.ReferredClientOther_CounselorRecord__c) 
-    && String.isBlank(newRecord.ReferredClient_CounselorRecord__c)) {
-    newRecord.ReferredClient_CounselorRecord__c = 'Other';
-}
-
+            newRecord.ReferredClient_CounselorRecord__c = session.Referral_To__c;
+            newRecord.ReferredClientOther_CounselorRecord__c = session.Referral_To_Other__c;
+            if (!String.isBlank(newRecord.ReferredClientOther_CounselorRecord__c)
+                && String.isBlank(newRecord.ReferredClient_CounselorRecord__c)) {
+                newRecord.ReferredClient_CounselorRecord__c = 'Other';
+            }
             
             newRecord.SessionType_CounselorRecord__c = session.Delivery_Type__c;
-            // Use the map to set the SessionType_CounselorRecord__c value based on Delivery_Type__c
             if (deliveryTypeMap.containsKey(session.Delivery_Type__c)) {
                 newRecord.SessionType_CounselorRecord__c = deliveryTypeMap.get(session.Delivery_Type__c);
             } else {
-                newRecord.SessionType_CounselorRecord__c = 'Other';  // Handle unexpected values
+                newRecord.SessionType_CounselorRecord__c = 'Other';
             }
             
             newRecord.Language_CounselorRecord__c = session.Language__c;
@@ -1061,42 +848,26 @@ if (!String.isBlank(newRecord.ReferredClientOther_CounselorRecord__c)
             newRecord.CounselingHours_Prepare__c = session.Prep_Hours__c;
             newRecord.CounselingHours_Travel__c = session.Travel_Hours__c;
 
-// Translate and set ExportCountries_CounselorRecord__c
-String exportCountries2 = session.Account__r.Export_Countries__c;
+            String exportCountries2 = session.Account__r.Export_Countries__c;
+            if (String.isNotBlank(exportCountries2)) {
+                List<String> countries = exportCountries2.split(';');
+                for (Integer i = 0; i < countries.size(); i++) {
+                    if ('Hong Kong'.equalsIgnoreCase(countries[i].trim())) { countries[i] = 'China'; }
+                }
+                newRecord.ExportCountries_CounselorRecord__c = toCamelCaseCountries(String.join(countries, '; '));
+            } else {
+                newRecord.ExportCountries_CounselorRecord__c = exportCountries2;
+            }
 
-// Check if ExportCountries is not blank and process the values
-if (String.isNotBlank(exportCountries2)) {
-    List<String> countries = exportCountries2.split(';');
-    for (Integer i = 0; i < countries.size(); i++) {
-        if ('Hong Kong'.equalsIgnoreCase(countries[i].trim())) {
-            // Translate 'Hong Kong' to 'China'
-            countries[i] = 'China';
-        }
-    }
-    // Convert the list of countries to camel case
-    newRecord.ExportCountries_CounselorRecord__c = toCamelCaseCountries(String.join(countries, '; '));
-} else {
-    // Retain original value if blank/null
-    newRecord.ExportCountries_CounselorRecord__c = exportCountries2;
-}
-
-
-            // Truncate Notes__c to 1,000 characters if it exceeds that length
-            newRecord.CounselorNotes_CounselorRecord__c = session.Notes__c != null && session.Notes__c.length() > 1000 
-            ? session.Notes__c.substring(0, 1000) 
-            : session.Notes__c;
+            newRecord.CounselorNotes_CounselorRecord__c = session.Notes__c != null && session.Notes__c.length() > 1000
+                ? session.Notes__c.substring(0, 1000) : session.Notes__c;
             
-            // Sub-section of CounselorRecord: TrainingSession
+            // ── TrainingSession ───────────────────────────────────────────────
             newRecord.DateTrainingStarted_CounselorRecord__c = session.Session_Date__c;
             newRecord.PartnerTrainingNumber_CounselorRecord__c = session.Event__r.EDMIS_Key__c;
             newRecord.EmployeesTrained_CounselorRecord__c = session.Employees_Trained__c;
             newRecord.HoursTrained_CounselorRecord__c = session.Total_Training_Hours__c;
 
-            // End of Section: ClientIntake
-
-            // Additional mappings from other related fields...
-
-            // Insert the new SBA_641_Output__c record
             outputRecords.add(newRecord);
         }
 
@@ -1106,18 +877,13 @@ if (String.isNotBlank(exportCountries2)) {
     }
 
     public void finish(Database.BatchableContext bc) {
-        // Fetch the email of the user who ran the batch job
         String jobOwnerEmail = [SELECT Email FROM User WHERE Id = :UserInfo.getUserId()].Email;
-
-        // Create and send an email with the number of records processed
         if (!String.isBlank(jobOwnerEmail)) {
             Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
             email.setToAddresses(new String[] { jobOwnerEmail });
             email.setSubject('SBA641 Batch Job Completion');
             email.setPlainTextBody('The SBA641 Batch job has completed successfully. ' +
                                    'Total number of records processed: ' + processedRecordsCount + '.');
-
-            // Send the email
             Messaging.sendEmail(new Messaging.SingleEmailMessage[] { email });
             System.debug('Email sent to job owner: ' + jobOwnerEmail + ' with processed record count: ' + processedRecordsCount);
         }
