@@ -602,9 +602,13 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                 'Waste Management & Remediation Services' => 'Waste Management and Remediation Services',
                 'Not Set' => 'Other Services (except Public Administration)',
                 'Consumer Goods' => 'Retail Trade',
+                'Consumer Services' => 'Other Services (except Public Administration)',
                 'Information Technology and Services' => 'Information',
                 'Agriculture, Forestry, Fishing and Hunting' => 'Agriculture, Forestry, Fishing and Hunting',
-                'Real Estate and Rental and Leasing' => 'Real Estate and Rental and Leasing'
+                'Real Estate and Rental and Leasing' => 'Real Estate and Rental and Leasing',
+                'Computer Software' => 'Information',
+                'Consumer Services' => 'Other Services (except Public Administration)',
+                'Hospital & Health Care' => 'Health Care and Social Assistance'
             };
 
             if (industryMapping.containsKey(session.Account__r.Industry)) {
