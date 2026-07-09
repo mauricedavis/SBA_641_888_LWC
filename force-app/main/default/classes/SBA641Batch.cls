@@ -454,7 +454,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                 if (raceValue == 'Prefer Not to Say') { raceValue = 'Prefer not to say'; }
                 if (raceValue == 'Arab or Middle Eastern') { raceValue = 'Middle Eastern'; }
                 if (raceValue == 'Other') { raceValue = 'Prefer not to say'; }
-                if (raceValue == 'American Indian or Alaska Native') { raceValue = 'Native American/Alaska Native'; }
+                if (raceValue == 'American Indian or Alaska Native') { raceValue = 'Native American/Alaska Native'; } if (raceValue == 'Native Hawaiian or Other Pacific Islander') { raceValue = 'Native Hawaiian/Other Pacific Islander'; }
                 newRecord.RaceClientIntake__c = raceValue.length() > 80 ? raceValue.substring(0, 80) : raceValue;
             }
 
@@ -620,7 +620,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                     rawIndustry = rawIndustry.replace('Waste Management & Remediation Services', 'Waste Management and Remediation Services');
                     rawIndustry = rawIndustry.replace('Waste Management &amp; Remediation Services', 'Waste Management and Remediation Services');
                 }
-                newRecord.BusinessType_ClientIntake__c = rawIndustry;
+                newRecord.BusinessType_ClientIntake__c = 'Other Services (except Public Administration)';
             }
             if (String.isBlank(newRecord.BusinessType_ClientIntake__c) && 'Yes'.equalsIgnoreCase(newRecord.CurrentlyInBusiness_ClientIntake__c)) {
                 newRecord.BusinessType_ClientIntake__c = 'Other Services (except Public Administration)';
@@ -650,7 +650,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                 newRecord.TotalNumberofEmployees_ClientIntake__c = newRecord.NumberOfEmployeesInExportingBusiness__c + 1;
             }
             
-            newRecord.GrossRevenues_ClientAnnualIncomePart2__c = session.Account__r.AnnualRevenue;
+            Decimal annualRev2 = session.Account__r.AnnualRevenue; newRecord.GrossRevenues_ClientAnnualIncomePart2__c = (annualRev2 == null) ? null : Math.min(annualRev2, 1000000000);
             newRecord.ProfitLoss_ClientAnnualIncomePart2__c = session.Account__r.Annual_PL__c;
             newRecord.ExportGrossRevenuesOrSales__c = session.Account__r.Export_Sales__c;
             
@@ -737,7 +737,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
 
             if (session.Impact__r != null && session.Impact__r.New_Business__c == true) {
                 newRecord.ReportableImpact__c = 'Yes';
-                newRecord.DateofReportableImpact__c = session.Impact__r.CloseDate;
+                newRecord.DateofReportableImpact__c = (session.Impact__r.CloseDate != null && session.Impact__r.CloseDate < startDate) ? startDate : session.Impact__r.CloseDate;
             } else {
                 newRecord.ReportableImpact__c = 'No';
                 newRecord.DateofReportableImpact__c = null;
@@ -765,7 +765,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                 newRecord.TotalNumberOfEmployees_CounselorRecord__c = newRecord.NumberOfEmployeesExportingBusiness_Part3__c + 1;
             }
             
-            newRecord.GrossRevenues_ClientAnnualIncomePart3__c = session.Account__r.AnnualRevenue;
+            Decimal annualRev3 = session.Account__r.AnnualRevenue; newRecord.GrossRevenues_ClientAnnualIncomePart3__c = (annualRev3 == null) ? null : Math.min(annualRev3, 1000000000);
             newRecord.ProfitLoss_ClientAnnualIncomePart3__c = session.Account__r.Annual_PL__c;
             newRecord.ExportGrossRevenuesOrSales_Part3__c = session.Account__r.Export_Sales__c;
             if (session.Account__r.Growth_Client__c == true) {

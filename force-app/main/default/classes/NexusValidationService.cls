@@ -180,6 +180,12 @@ public with sharing class NexusValidationService {
             countryCheck(out,id,pn,sid,r.CountryAddressPart1__c,'Country (Part1)');
             countryCheck(out,id,pn,sid,r.Country_AddressPart3__c,'Country (Part3)');
 
+            // ZipCode — required by NEXUS when country is United States
+            if ('United States'.equalsIgnoreCase(r.CountryAddressPart1__c) && String.isBlank(r.ZipCodeAddressPart1__c))
+                warn(out,id,pn,sid,'ZipCode (Part1)','Required for US Address — ZipCode is blank. Update Account Billing Zip before generating XML.');
+            if ('United States'.equalsIgnoreCase(r.Country_AddressPart3__c) && String.isBlank(r.ZipCode_AddressPart3__c))
+                warn(out,id,pn,sid,'ZipCode (Part3)','Required for US Address — ZipCode is blank. Update Account Billing Zip before generating XML.');
+
             // Military status
             if (String.isNotBlank(r.MilitaryStatusClientIntake__c)
                     && !VALID_MILITARY.contains(r.MilitaryStatusClientIntake__c))
