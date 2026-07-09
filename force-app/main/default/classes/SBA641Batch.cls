@@ -333,6 +333,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                            'Impact__r.SBA_Loan_Type__c, ' +
                            'Impact__c, ' +
                            'Impact__r.New_Business__c, ' +
+                           'Impact__r.StageName, ' +
                            'Impact__r.CloseDate, ' +
                            'Area_of_Counseling__c, ' +
                            'Delivery_Type__c, ' +
@@ -735,7 +736,7 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                 newRecord.VerifiedToBeInBusiness_CounselorRecord__c = 'Yes';
             }
 
-            if (session.Impact__r != null && session.Impact__r.New_Business__c == true) {
+            if (session.Impact__r != null && session.Impact__r.New_Business__c == true && session.Impact__r.StageName == 'Impact Verified') {
                 newRecord.ReportableImpact__c = 'Yes';
                 newRecord.DateofReportableImpact__c = (session.Impact__r.CloseDate != null && session.Impact__r.CloseDate < startDate) ? startDate : session.Impact__r.CloseDate;
             } else {
