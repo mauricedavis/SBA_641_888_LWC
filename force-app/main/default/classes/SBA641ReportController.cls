@@ -92,6 +92,7 @@ public with sharing class SBA641ReportController {
                    Primary_PhonePart3__c, Secondary_PhonePart3__c,
                    CountryAddressPart1__c, Country_AddressPart3__c,
                    DateCounseled_CounselorRecord__c, PartnerSessionNumber_Counselor__c,
+                   ZipCodeAddressPart1__c, ZipCode_AddressPart3__c,
                    SessionId__c
             FROM SBA_641_Output__c
             WHERE Quarter_Year__c = :quarterYear
