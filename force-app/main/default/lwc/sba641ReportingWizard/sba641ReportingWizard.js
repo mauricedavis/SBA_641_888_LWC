@@ -11,16 +11,20 @@ import getUploadRecordId from '@salesforce/apex/SBA641ReportController.getUpload
 import saveRunState      from '@salesforce/apex/SBA641ReportController.saveRunState';
 import loadRunState      from '@salesforce/apex/SBA641ReportController.loadRunState';
 import clearRunState     from '@salesforce/apex/SBA641ReportController.clearRunState';
+import pollJobStatus     from '@salesforce/apex/SBA641ReportController.pollJobStatus';
 
 const QUARTER_OPTIONS = [
-    { label: 'Q1 (Oct 1 \u2013 Dec 31)', value: 'Q1' },
-    { label: 'Q2 (Jan 1 \u2013 Mar 31)', value: 'Q2' },
-    { label: 'Q3 (Apr 1 \u2013 Jun 30)', value: 'Q3' },
-    { label: 'Q4 (Jul 1 \u2013 Sep 30)', value: 'Q4' }
+    { label: 'Q1 (Oct 1 – Dec 31)', value: 'Q1' },
+    { label: 'Q2 (Jan 1 – Mar 31)', value: 'Q2' },
+    { label: 'Q3 (Apr 1 – Jun 30)', value: 'Q3' },
+    { label: 'Q4 (Jul 1 – Sep 30)', value: 'Q4' }
 ];
 
 const YEAR_OPTIONS = [2024, 2025, 2026, 2027, 2028, 2029, 2030]
     .map(y => ({ label: String(y), value: String(y) }));
+
+// Job statuses that mean the job no longer exists or is unrecoverable
+const DEAD_STATUSES = new Set(['NotFound', 'Failed', 'Aborted']);
 
 export default class Sba641ReportingWizard extends LightningElement {
 
@@ -57,11 +61,48 @@ export default class Sba641ReportingWizard extends LightningElement {
                 this.selectedQuarter = state.selectedQuarter || '';
                 this.selectedYear    = state.selectedYear    || String(new Date().getFullYear());
                 this.dateLabel       = state.dateLabel       || '';
-                this.extractJobId    = state.extractJobId    || null;
                 this.extractedCount  = state.extractedCount  || 0;
                 this.xmlJobId        = state.xmlJobId        || null;
-                this.currentStep     = state.currentStep     || 1;
-                if (this.currentStep === 2 && this.extractJobId) this.isExtracting = true;
+
+                // ── Validate the restored extract job before trusting it ──────
+                // A stale "In Progress" run state with a dead job ID would cause
+                // the progress tracker to poll forever returning "NotFound".
+                if (state.currentStep === 2 && state.extractJobId) {
+                    let probe;
+                    try { probe = await pollJobStatus({ jobId: state.extractJobId }); }
+                    catch(e) { probe = null; }
+
+                    const isDead      = !probe || DEAD_STATUSES.has(probe.status);
+                    const isCompleted = probe && probe.status === 'Completed';
+
+                    if (isDead) {
+                        // Stale/dead job — wipe state and drop back to Step 1
+                        try { await clearRunState(); } catch(e) {}
+                        this.currentStep  = 1;
+                        this.isExtracting = false;
+                        this.extractJobId = null;
+                        return;
+                    } else if (isCompleted) {
+                        // Job finished while the page was away — skip to Step 3
+                        this.extractJobId = null;
+                        this.isExtracting = false;
+                        try { this.extractedCount = await getOutputCount({ quarterYear: this.quarterYear }); }
+                        catch(e) { this.extractedCount = 0; }
+                        this.currentStep = 3;
+                        await this._save('In Progress');
+                        await this.handleValidate();
+                        return;
+                    } else {
+                        // Still running — restore the spinner normally
+                        this.extractJobId = state.extractJobId;
+                        this.isExtracting = true;
+                        this.currentStep  = 2;
+                    }
+                } else {
+                    this.extractJobId = state.extractJobId || null;
+                    this.currentStep  = state.currentStep  || 1;
+                }
+
                 if (this.currentStep >= 4 && this.quarterYear) {
                     try {
                         const parts = await getXmlPartFiles({ quarterYear: this.quarterYear });
@@ -224,7 +265,7 @@ export default class Sba641ReportingWizard extends LightningElement {
     async handleDownloadAndMerge() {
         this.isMerging     = true;
         this.mergeComplete = false;
-        this.mergeStatus   = 'Opening download page\u2026';
+        this.mergeStatus   = 'Opening download page…';
         try {
             const uploadId = await getUploadRecordId({ quarterYear: this.quarterYear });
             if (!uploadId) {
@@ -235,7 +276,7 @@ export default class Sba641ReportingWizard extends LightningElement {
             window.open('/apex/SBA641_XMLMerge?uploadId=' + uploadId, '_blank');
             this.isMerging     = false;
             this.mergeComplete = true;
-            this.mergeStatus   = '\u2705 Download page opened in new tab. Follow the instructions there to get your merged XML file.';
+            this.mergeStatus   = '✅ Download page opened in new tab. Follow the instructions there to get your merged XML file.';
         } catch(err) {
             this.isMerging   = false;
             this.mergeStatus = 'Error: ' + (err.body ? err.body.message : err.message || String(err));
