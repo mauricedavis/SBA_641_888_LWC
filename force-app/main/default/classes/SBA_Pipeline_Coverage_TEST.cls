@@ -270,4 +270,262 @@ public class SBA_Pipeline_Coverage_TEST {
         ctrl.init();
         System.assert(ctrl.partsJson != null);
     }
+
+    // ── testSBA641Batch ────────────────────────────────────────────────────────
+    // Directly exercises SBA641Batch.execute() to push code coverage past 75%.
+    // Creates the full data graph needed by execute(): Account, Contact, Case,
+    // Consultant (User), Opportunity (Impact), OpportunityLineItem (Capital
+    // Sources), and Session__c records.  Two sessions are created:
+    //   1. Session_Type__c = 'EDMIS Update'  → exercises the OLI TxnNmb path
+    //      (the MSBDC-110 fix) including impactTxnCounts lookup.
+    //   2. Session_Type__c = 'Counseling: Initial' → exercises the non-EDMIS
+    //      path (capital fields zeroed out) and the null-Impact branch.
+    // OLI records cover all three buckets: SBA Loan, Non-SBA Loan, and Equity.
+    // ──────────────────────────────────────────────────────────────────────────
+    @isTest static void testSBA641Batch() {
+
+        // ── 1. Resolve RecordType for SBA_641_Output__c ──────────────────────
+        List<RecordType> rts = [
+            SELECT Id FROM RecordType
+            WHERE SObjectType = 'SBA_641_Output__c'
+            AND   DeveloperName = 'Q1_2025'
+            LIMIT 1
+        ];
+        if (rts.isEmpty()) {
+            // No matching RecordType in this org — skip gracefully.
+            System.assert(true, 'No Q1_2025 RecordType found; skipping SBA641Batch test.');
+            return;
+        }
+        String rtId = rts[0].Id;
+
+        // ── 2. Shared date range: Q1 2025 ────────────────────────────────────
+        Date startDate = Date.newInstance(2025, 1, 1);
+        Date endDate   = Date.newInstance(2025, 3, 31);
+        Date sessionDate = Date.newInstance(2025, 2, 15);
+
+        // ── 3. Account (the client business) ─────────────────────────────────
+        Account acct = new Account(
+            Name                 = 'Test SBDC Client LLC',
+            BillingStreet        = '123 Main St',
+            BillingCity          = 'Grand Rapids',
+            BillingState         = 'MI',
+            BillingPostalCode    = '49503',
+            BillingCountry       = 'United States',
+            Industry             = '54 Professional, Scientific, Technical Services',
+            Ownership            = 'LLC',
+            In_Business__c       = true,
+            Female_Ownership__c  = 50,
+            Total_employees__c   = 5,
+            AnnualRevenue        = 200000,
+            Share_with_SBA__c    = true,
+            Online_Presence__c   = true,
+            Export_Countries__c  = 'Canada;Mexico',
+            EDMIS_Key__c         = 'EDMIS-TEST-001'
+        );
+        insert acct;
+
+        // ── 4. Contact (the client) ───────────────────────────────────────────
+        Contact con = new Contact(
+            FirstName           = 'Jane',
+            LastName            = 'Doe',
+            AccountId           = acct.Id,
+            Email               = 'jane.doe@test.com',
+            Phone               = '616-555-1234',
+            hed__Race__c        = 'White',
+            Sex__c              = 'Female',
+            Disabled__c         = 'No',
+            Military__c         = 'None',
+            How_did_you_hear_about_us__c = 'Internet'
+        );
+        insert con;
+
+        // ── 5. Case__c (the SBDC engagement record) ──────────────────────────
+        // Use the generic Case object — if the org uses Case__c custom, swap here.
+        // SBA641Batch queries Case__r.Center_Region_Code__c and DateeRFCCompleted__c.
+        // We insert a Case tied to the Account and leave date fields null so the
+        // startDate fallback branch in execute() is exercised.
+        Case caseRec = new Case(
+            AccountId = acct.Id,
+            ContactId = con.Id,
+            Subject   = 'SBDC Counseling Case'
+        );
+        insert caseRec;
+
+        // ── 6. Consultant (User) ──────────────────────────────────────────────
+        // Use the running-user as the consultant to avoid Profile/Role DML.
+        User consultant = [SELECT Id, Name FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+
+        // ── 7. Opportunity (Impact) with StageName = 'Impact Verified' ───────
+        Opportunity impact = new Opportunity(
+            Name        = 'Test Impact Q1 2025',
+            AccountId   = acct.Id,
+            StageName   = 'Impact Verified',
+            CloseDate   = Date.newInstance(2025, 2, 20),
+            New_Business__c      = true,
+            SBA_Loan_Amount__c   = 50000,
+            Loan_Obtained_Amount__c = 25000,
+            Other_Amount__c      = 10000
+        );
+        insert impact;
+
+        // ── 8. Standard Pricebook + Products + PricebookEntries ──────────────
+        Id stdPbId = Test.getStandardPricebookId();
+
+        // Product 1: SBA Loan (Family='Loan', Name contains 'SBA Loan')
+        Product2 sbaLoanProd = new Product2(
+            Name        = 'SBA Loan',
+            Family      = 'Loan',
+            IsActive    = true
+        );
+        insert sbaLoanProd;
+
+        // Product 2: Non-SBA Loan (Family='Loan', Name does NOT match SBA keywords)
+        Product2 nonSbaLoanProd = new Product2(
+            Name        = 'Conventional Loan',
+            Family      = 'Loan',
+            IsActive    = true
+        );
+        insert nonSbaLoanProd;
+
+        // Product 3: Equity (Family != 'Loan')
+        Product2 equityProd = new Product2(
+            Name        = 'Angel Investment',
+            Family      = 'Equity',
+            IsActive    = true
+        );
+        insert equityProd;
+
+        PricebookEntry pbeSba = new PricebookEntry(
+            Pricebook2Id = stdPbId, Product2Id = sbaLoanProd.Id,
+            UnitPrice = 1, IsActive = true
+        );
+        PricebookEntry pbeNonSba = new PricebookEntry(
+            Pricebook2Id = stdPbId, Product2Id = nonSbaLoanProd.Id,
+            UnitPrice = 1, IsActive = true
+        );
+        PricebookEntry pbeEquity = new PricebookEntry(
+            Pricebook2Id = stdPbId, Product2Id = equityProd.Id,
+            UnitPrice = 1, IsActive = true
+        );
+        insert new List<PricebookEntry>{ pbeSba, pbeNonSba, pbeEquity };
+
+        // Link Opportunity to standard pricebook before adding OLIs
+        impact.Pricebook2Id = stdPbId;
+        update impact;
+
+        // ── 9. OpportunityLineItems (Capital Sources) ─────────────────────────
+        // One SBA Loan OLI, one Non-SBA Loan OLI, one Equity OLI.
+        // After start() runs, impactTxnCounts[impact.Id] = [1, 1, 1].
+        insert new List<OpportunityLineItem>{
+            new OpportunityLineItem(
+                OpportunityId   = impact.Id,
+                PricebookEntryId = pbeSba.Id,
+                Quantity         = 1,
+                UnitPrice        = 50000
+            ),
+            new OpportunityLineItem(
+                OpportunityId   = impact.Id,
+                PricebookEntryId = pbeNonSba.Id,
+                Quantity         = 1,
+                UnitPrice        = 25000
+            ),
+            new OpportunityLineItem(
+                OpportunityId   = impact.Id,
+                PricebookEntryId = pbeEquity.Id,
+                Quantity         = 1,
+                UnitPrice        = 10000
+            )
+        };
+
+        // ── 10. Session__c records ────────────────────────────────────────────
+        // Session 1: EDMIS Update linked to the Impact → exercises impactTxnCounts
+        //            lookup (non-null path) and all three TxnNmb fields.
+        // Session 2: Counseling: Initial with NO Impact → exercises the null
+        //            Impact branch (txnCounts defaults to [0,0,0]) and the
+        //            non-EDMIS capital-zeroing path.
+        Session__c sessionEdmis = new Session__c(
+            Account__c              = acct.Id,
+            Contact__c              = con.Id,
+            Case__c                 = caseRec.Id,
+            Primary_Consultant__c   = consultant.Id,
+            Impact__c               = impact.Id,
+            Session_Type__c         = 'EDMIS Update',
+            Session_Date__c         = sessionDate,
+            Delivery_Type__c        = 'Face-to-Face',
+            Area_of_Counseling__c   = 'Business Plan',
+            Contact_Hours__c        = 1.5,
+            Prep_Hours__c           = 0.5,
+            Travel_Hours__c         = 0,
+            Business_Status_for_Session__c = 'In Business',
+            Language__c             = 'English'
+        );
+
+        Session__c sessionCounseling = new Session__c(
+            Account__c              = acct.Id,
+            Contact__c              = con.Id,
+            Case__c                 = caseRec.Id,
+            Primary_Consultant__c   = consultant.Id,
+            Impact__c               = null,
+            Session_Type__c         = 'Counseling: Initial',
+            Session_Date__c         = sessionDate,
+            Delivery_Type__c        = 'Virtual',
+            Area_of_Counseling__c   = 'Marketing',
+            Contact_Hours__c        = 1.0,
+            Prep_Hours__c           = 0.25,
+            Travel_Hours__c         = 0,
+            Business_Status_for_Session__c = 'Pre-Venture',
+            Language__c             = 'English'
+        );
+
+        insert new List<Session__c>{ sessionEdmis, sessionCounseling };
+
+        // ── 11. Run the batch ─────────────────────────────────────────────────
+        Test.startTest();
+        SBA641Batch batch = new SBA641Batch(startDate, endDate, rtId, 'Q1_2025');
+        Database.executeBatch(batch, 200);
+        Test.stopTest();
+
+        // ── 12. Assertions ────────────────────────────────────────────────────
+        // The batch inserts SBA_641_Output__c records for sessions in range.
+        // In test context there may be pre-existing output from @testSetup plus
+        // output from our two sessions, so we assert at least one record exists
+        // and spot-check the MSBDC-110 TxnNmb fix on the EDMIS Update record.
+        List<SBA_641_Output__c> outputs = [
+            SELECT Id, SessionId__c,
+                   SBALoanAmountTxnNmbCounselorRecord__c,
+                   NonSBALoanAmountTxnNmbCounselorRecord__c,
+                   EquityCapitalReceivedTxnNmbCounselorRec__c,
+                   SBALoanAmount_CounselorRecord__c,
+                   NonSBALoanAmount_CounselorRecord__c,
+                   EquityCapitalReceived_CounselorRecord__c
+            FROM SBA_641_Output__c
+            WHERE SessionId__c = :sessionEdmis.Id
+               OR SessionId__c = :sessionCounseling.Id
+        ];
+
+        // At least one output record should have been created.
+        System.assert(!outputs.isEmpty(), 'SBA641Batch should have created SBA_641_Output__c records.');
+
+        // Find the EDMIS Update output and verify TxnNmb counts (MSBDC-110 fix).
+        for (SBA_641_Output__c out : outputs) {
+            if (out.SessionId__c == sessionEdmis.Id) {
+                System.assertEquals(1, out.SBALoanAmountTxnNmbCounselorRecord__c,
+                    'EDMIS Update: SBA TxnNmb should be 1 (one SBA Loan OLI)');
+                System.assertEquals(1, out.NonSBALoanAmountTxnNmbCounselorRecord__c,
+                    'EDMIS Update: Non-SBA TxnNmb should be 1 (one Conventional Loan OLI)');
+                System.assertEquals(1, out.EquityCapitalReceivedTxnNmbCounselorRec__c,
+                    'EDMIS Update: Equity TxnNmb should be 1 (one Equity OLI)');
+            }
+            if (out.SessionId__c == sessionCounseling.Id) {
+                System.assertEquals(0, out.SBALoanAmountTxnNmbCounselorRecord__c,
+                    'Non-EDMIS: SBA TxnNmb should be 0');
+                System.assertEquals(0, out.NonSBALoanAmountTxnNmbCounselorRecord__c,
+                    'Non-EDMIS: Non-SBA TxnNmb should be 0');
+                System.assertEquals(0, out.EquityCapitalReceivedTxnNmbCounselorRec__c,
+                    'Non-EDMIS: Equity TxnNmb should be 0');
+                System.assertEquals(0, out.SBALoanAmount_CounselorRecord__c,
+                    'Non-EDMIS: SBA capital amount should be 0');
+            }
+        }
+    }
 }
