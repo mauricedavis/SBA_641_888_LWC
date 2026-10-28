@@ -82,4 +82,43 @@ public class SBA888_XMLBatch_TEST {
         Test.stopTest();
         System.assertNotEquals(null, jobId, '4-arg constructor batch job should have been enqueued.');
     }
+
+    // ── SBA888_XMLBatch_REFACTORED coverage ───────────────────────────────────
+    @isTest
+    static void testRefactoredBatchExecution() {
+        List<RecordType> rts = [
+            SELECT Id FROM RecordType
+            WHERE SObjectType = 'SBA_888_Output__c'
+            AND DeveloperName = 'Q1_2024'
+            LIMIT 1
+        ];
+        if (!rts.isEmpty()) {
+            insert new SBA_888_Output__c(
+                RecordTypeId = rts[0].Id,
+                Quarter_Year__c = 'Q3_2026',
+                PartnerTrainingNumber__c = 'PTN-REF-001',
+                LocationCode__c = '5678',
+                DateTrainingStarted__c = Date.today().addDays(-5),
+                TotalTrainingHours__c = 4,
+                TrainingTitle__c = 'Refactored Workshop',
+                Total_NumberTrained__c = 5,
+                NumberOfSessions__c = 1,
+                ProgramFormatType__c = 'Online',
+                Language_Code__c = 'English',
+                TrainingTopic__c = 'eCommerce',
+                TrainingPartners_Code_SBDC__c = 'SBDC',
+                DollarAmountOfFees__c = 50,
+                HispanicOrLatinoOrigin_NumberTrained__c = 1,
+                Female_NumberTrained__c = 2,
+                White_NumberTrained__c = 3
+            );
+        }
+        Test.startTest();
+        SBA888_XMLBatch_REFACTORED batchJob = new SBA888_XMLBatch_REFACTORED('Q3_2026', 'Annual');
+        Id jobId = Database.executeBatch(batchJob, 200);
+        Test.stopTest();
+        System.assertNotEquals(null, jobId, 'REFACTORED batch job should have been enqueued.');
+        List<SBA888_XML_Upload__c> uploads = [SELECT Id FROM SBA888_XML_Upload__c WHERE QuarterYear__c = 'Q3_2026'];
+        System.assertEquals(1, uploads.size(), 'REFACTORED finish() should insert an upload record');
+    }
 }
