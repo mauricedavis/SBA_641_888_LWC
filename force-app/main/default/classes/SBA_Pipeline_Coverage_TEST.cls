@@ -534,4 +534,36 @@ public class SBA_Pipeline_Coverage_TEST {
                 'EquityCapitalReceivedTxnNmbCounselorRec__c should not be null');
         }
     }
+
+    // ── SBA888_XMLBatch_REFACTORED coverage ───────────────────────────────────
+    @isTest
+    static void testSBA888XMLBatchRefactored() {
+        // Insert a 888 output record with Quarter_Year__c so execute() body runs.
+        List<RecordType> rts = [SELECT Id FROM RecordType WHERE SObjectType = 'SBA_888_Output__c' AND DeveloperName = 'Q1_2025' LIMIT 1];
+        if (!rts.isEmpty()) {
+            insert new SBA_888_Output__c(
+                RecordTypeId = rts[0].Id,
+                Quarter_Year__c = 'Q3_2026',
+                PartnerTrainingNumber__c = 'PTN-REF-001',
+                LocationCode__c = '5678',
+                DateTrainingStarted__c = Date.today().addDays(-5),
+                TotalTrainingHours__c = 4,
+                TrainingTitle__c = 'Refactored Workshop',
+                Total_NumberTrained__c = 5,
+                NumberOfSessions__c = 1,
+                ProgramFormatType__c = 'Online',
+                Language_Code__c = 'English',
+                TrainingTopic__c = 'eCommerce',
+                TrainingPartners_Code_SBDC__c = 'SBDC',
+                DollarAmountOfFees__c = 50
+            );
+        }
+        Test.startTest();
+        SBA888_XMLBatch_REFACTORED batchJob = new SBA888_XMLBatch_REFACTORED('Q3_2026', 'Annual');
+        Database.executeBatch(batchJob, 200);
+        Test.stopTest();
+        // Verify finish() ran and created the upload record.
+        List<SBA888_XML_Upload__c> uploads = [SELECT Id FROM SBA888_XML_Upload__c WHERE QuarterYear__c = 'Q3_2026'];
+        System.assertEquals(1, uploads.size(), 'SBA888_XMLBatch_REFACTORED finish() should insert an upload record');
+    }
 }
