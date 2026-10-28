@@ -8,6 +8,11 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
     private String xmlOutput = '';  // To store the generated XML content
     private Map<String, String> counselingMapping = new Map<String, String>(); // Map for Area_of_Counseling__c to CounselingSeeking_ClientIntake__c
 
+    // Map from Impact (Opportunity) Id → [sbaTxnCount, nonSbaTxnCount, equityTxnCount]
+    // Populated in start() so TxnNmb fields reflect actual OLI counts, not a binary 0/1 flag.
+    // Index: 0 = SBA loans, 1 = Non-SBA loans, 2 = Equity/other
+    private Map<Id, Integer[]> impactTxnCounts = new Map<Id, Integer[]>();
+
     // Constructor to initialize the date range, RecordTypeId, and counseling mappings
     public SBA641Batch(Date startDate, Date endDate, String varRecordTypeId, String varQuarterYear) {
         this.startDate = startDate;
@@ -189,11 +194,11 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
         if (input == null) {
             return '';
         }
-        input = input.replaceAll('&', '&amp;');
-        input = input.replaceAll('<', '&lt;');
-        input = input.replaceAll('>', '&gt;');
-        input = input.replaceAll('"', '&quot;');
-        input = input.replaceAll('\'', '&apos;');
+        input = input.replaceAll('&', '&' + 'amp;');
+        input = input.replaceAll('<', '&' + 'lt;');
+        input = input.replaceAll('>', '&' + 'gt;');
+        input = input.replaceAll('"', '&' + 'quot;');
+        input = input.replaceAll(String.fromCharArray(new Integer[]{39}), '&' + 'apos;');
         return input;
     }
     
@@ -387,6 +392,49 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                            'AND Session_type__c IN (\'EDMIS Update\', \'Counseling: Initial\', \'Counseling: Follow On\', \'Event Attendance\') ' +
 // Removed 07/28/2025      'AND EDMIS_Overall_Validation__c = TRUE AND Verified__c = FALSE ' +
                            'ORDER BY Session_Sort__c, Session_Date_Time__c, Session_Number__c';
+
+        // ── OLI TxnNmb pre-computation ─────────────────────────────────────────
+        // Query all Capital Source OLIs on Impacts that fall within the quarter.
+        // We build a map here (start-time, before batching) so execute() can look
+        // up exact counts per bucket rather than using the legacy binary 0/1 flag.
+        // Product Family determines the bucket; SBA-type Loan names identify the
+        // SBA sub-bucket within Family = 'Loan'.
+        Set<String> sbaLoanKeywords = new Set<String>{'sba loan','sba 7(a)','sba 504','microloan','sba microloan'};
+        for (OpportunityLineItem oli : [
+            SELECT OpportunityId,
+                   PricebookEntry.Product2.Family,
+                   PricebookEntry.Product2.Name
+            FROM   OpportunityLineItem
+            WHERE  Opportunity.CloseDate >= :startDate
+            AND    Opportunity.CloseDate <= :endDate
+            AND    Opportunity.StageName  = 'Impact Verified'
+        ]) {
+            String family = oli.PricebookEntry?.Product2?.Family;
+            String prodName = (oli.PricebookEntry?.Product2?.Name != null)
+                ? oli.PricebookEntry.Product2.Name.toLowerCase()
+                : '';
+
+            if (!impactTxnCounts.containsKey(oli.OpportunityId)) {
+                impactTxnCounts.put(oli.OpportunityId, new Integer[]{0, 0, 0});
+            }
+            Integer[] counts = impactTxnCounts.get(oli.OpportunityId);
+
+            Boolean isSbaLoan = false;
+            if (family == 'Loan') {
+                for (String kw : sbaLoanKeywords) {
+                    if (prodName.contains(kw)) { isSbaLoan = true; break; }
+                }
+            }
+
+            if (isSbaLoan) {
+                counts[0]++;        // SBALoanAmountTxnNmb
+            } else if (family == 'Loan') {
+                counts[1]++;        // NonSBALoanAmountTxnNmb
+            } else {
+                counts[2]++;        // EquityCapitalReceivedTxnNmb
+            }
+        }
+        // ── end OLI TxnNmb pre-computation ────────────────────────────────────
 
         return Database.getQueryLocator(query);
     }
@@ -617,9 +665,9 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
             } else {
                 String rawIndustry = session.Account__r.Industry;
                 if (String.isNotBlank(rawIndustry)) {
-                    rawIndustry = rawIndustry.replace('&amp;', '&').replace('&amp', '&');
+                    rawIndustry = rawIndustry.replace('&' + 'amp;', '&').replace('&' + 'amp', '&');
                     rawIndustry = rawIndustry.replace('Waste Management & Remediation Services', 'Waste Management and Remediation Services');
-                    rawIndustry = rawIndustry.replace('Waste Management &amp; Remediation Services', 'Waste Management and Remediation Services');
+                    rawIndustry = rawIndustry.replace('Waste Management &' + 'amp; Remediation Services', 'Waste Management and Remediation Services');
                 }
                 newRecord.BusinessType_ClientIntake__c = 'Other Services (except Public Administration)';
             }
@@ -786,12 +834,15 @@ public with sharing class SBA641Batch implements Database.Batchable<SObject>, Da
                 newRecord.SBALoanAmount_CounselorRecord__c         = session.Impact__r.SBA_Loan_Amount__c;
                 newRecord.NonSBALoanAmount_CounselorRecord__c      = session.Impact__r.Loan_Obtained_Amount__c;
                 newRecord.EquityCapitalReceived_CounselorRecord__c = session.Impact__r.Other_Amount__c;
-                newRecord.SBALoanAmountTxnNmbCounselorRecord__c =
-                    (newRecord.SBALoanAmount_CounselorRecord__c != null && newRecord.SBALoanAmount_CounselorRecord__c > 0) ? 1 : 0;
-                newRecord.NonSBALoanAmountTxnNmbCounselorRecord__c =
-                    (newRecord.NonSBALoanAmount_CounselorRecord__c != null && newRecord.NonSBALoanAmount_CounselorRecord__c > 0) ? 1 : 0;
-                newRecord.EquityCapitalReceivedTxnNmbCounselorRec__c =
-                    (newRecord.EquityCapitalReceived_CounselorRecord__c != null && newRecord.EquityCapitalReceived_CounselorRecord__c > 0) ? 1 : 0;
+                // FIX (MSBDC-110): TxnNmb fields must reflect the actual number of
+                // Capital Source (OLI) records per bucket, not a binary 0/1 flag.
+                // Counts were pre-built in start() into impactTxnCounts.
+                Integer[] txnCounts = (session.Impact__c != null && impactTxnCounts.containsKey(session.Impact__c))
+                    ? impactTxnCounts.get(session.Impact__c)
+                    : new Integer[]{0, 0, 0};
+                newRecord.SBALoanAmountTxnNmbCounselorRecord__c       = txnCounts[0];
+                newRecord.NonSBALoanAmountTxnNmbCounselorRecord__c    = txnCounts[1];
+                newRecord.EquityCapitalReceivedTxnNmbCounselorRec__c  = txnCounts[2];
             } else {
                 // Non-EDMIS sessions: zero out all capital and transaction number fields
                 newRecord.SBALoanAmount_CounselorRecord__c             = 0;
